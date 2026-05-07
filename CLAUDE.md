@@ -37,12 +37,10 @@ app/src/main/java/com/wulong/dict/
 │   └── usecase/              # 6 use cases (search, suggest, history CRUD)
 └── data/
     ├── local/
-    │   ├── MdxEngine.kt      # Dict asset copy → internal storage → trie build → lookup
-    │   ├── MdxParser.kt      # Pure-Kotlin MDX binary parser (v1/v2)
-    │   ├── TrieIndex.kt      # Case-insensitive prefix tree (~500K entries)
-    │   ├── AppDatabase.kt    # Room DB (search_history table)
+    │   ├── SqliteDictEngine.kt  # Read-only SQLite3 dictionary engine (search + suggest)
+    │   ├── AppDatabase.kt       # Room DB (search_history table)
     │   └── SearchHistoryDao.kt
-    └── repository/           # Implementations (DictionaryRepositoryImpl, HistoryRepositoryImpl)
+    └── repository/              # Implementations (DictionaryRepositoryImpl, HistoryRepositoryImpl)
 ```
 
 ## Navigation Flow
@@ -55,10 +53,13 @@ app/src/main/java/com/wulong/dict/
 
 ## Key Technical Details
 
-### MDX Engine Initialization
-- On cold start, `MdxEngine.initialize()` copies dictionary files from `assets/dictionaries/` to `filesDir/dict_indices/`, then parses MDX headers + keyword indices into a `TrieIndex`
-- Assets are 177MB+ across 3 dictionaries; `.mdx`/`.mdd`/`.css`/`.js` extensions are set as `noCompress` in `build.gradle.kts` for direct mmap/random-access
-- The parser (`MdxParser.kt`) handles both MDX v1 and v2 format auto-detection via heuristic (`key_id > num_entries * 2` means v1)
+### Dictionary Engine (SQLite3)
+- Dictionaries are pre-built `.sqlite3` files stored in `filesDir/dictionaries/` on the device
+- Each SQLite3 file has two tables: `search` (lower_key, original_key) and `entries` (key, content BLOB)
+- `SqliteDictEngine.open()` opens all 3 databases in read-only mode
+- Word lookup: `SELECT original_key FROM search WHERE lower_key = ?` → `SELECT content FROM entries WHERE key = ?`
+- Prefix suggestions: `SELECT original_key FROM search WHERE lower_key LIKE ? LIMIT ?`
+- To deploy dictionaries to device: `adb push Dictionary/* /data/data/com.wulong.dict/files/dictionaries/`
 
 ### WebView Pool
 - `WebViewPool` pre-warms 2 `WebView` instances in `Application.onCreate()` on the main thread
@@ -71,9 +72,6 @@ app/src/main/java/com/wulong/dict/
 - Referenced via `WulongFonts.PlayfairDisplay` in `Theme.kt`
 
 ## Known Issues / Gotchas
-
-### MdxEngine mdxFile overwrite bug
-In `MdxEngine.initialize()`, the `copyAssetsRecursively` local function captures outer `mdxFile`/`mddFile` variables. For the Oxford dictionary, the `中文例句释义反查/` subdirectory contains `oaldZhEn.mdx` which can overwrite the correct `mdxFile` reference depending on `AssetManager.list()` ordering. This causes the trie to be built from the wrong file, making all searches return empty. **Fix**: Only assign `mdxFile`/`mddFile` for top-level directory files, not subdirectory files.
 
 ### Error message opacity
 `SearchViewModel` init block catches `Exception` and shows `e.message ?: "初始化失败"`. Many exceptions have null messages (NPE, some IOExceptions). Always add `Log.e` with full stacktrace alongside the UI error, and include exception class name in the display string.

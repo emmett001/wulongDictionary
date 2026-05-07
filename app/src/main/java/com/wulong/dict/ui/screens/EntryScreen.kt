@@ -75,7 +75,7 @@ fun EntryScreen(
             )
         }
     ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues)) {
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             // ── Tab row: equal-width, 16sp+, accent indicator ──────────
             TabRow(
                 selectedTabIndex = pagerState.currentPage,
@@ -169,9 +169,10 @@ private fun DictPage(
         onDispose { webViewPool.release(webView) }
     }
 
-    // Lazy rendering: only load HTML when this tab becomes visible
+    // Load HTML only once when this tab first becomes visible
+    var hasLoaded by remember { mutableStateOf(false) }
     LaunchedEffect(isCurrentPage) {
-        if (isCurrentPage) {
+        if (isCurrentPage && !hasLoaded) {
             val baseUrl = if (dictDir != null) "file://${dictDir.absolutePath}/" else null
             webView.loadDataWithBaseURL(
                 baseUrl,
@@ -180,6 +181,7 @@ private fun DictPage(
                 "UTF-8",
                 null
             )
+            hasLoaded = true
         }
     }
 

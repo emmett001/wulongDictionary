@@ -5,7 +5,7 @@ import com.wulong.dict.domain.model.Suggestion
 
 interface DictionaryRepository {
 
-    /** One-time initialization: copy assets, parse headers, build trie index. */
+    /** One-time initialization: open SQLite dictionary databases. */
     suspend fun initialize()
 
     /** Exact word lookup across all dictionaries. */

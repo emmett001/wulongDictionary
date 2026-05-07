@@ -56,9 +56,9 @@ android {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
 
-    // Keep MDX files uncompressed in APK so we can mmap/random-access them
+    // Keep CSS/JS uncompressed for WebView direct file access
     androidResources {
-        noCompress += listOf("mdx", "mdd", "css", "js")
+        noCompress += listOf("css", "js")
     }
 }
 

@@ -2,8 +2,7 @@ package com.wulong.dict
 
 import android.content.Context
 import com.wulong.dict.data.local.AppDatabase
-import com.wulong.dict.data.local.MdxEngine
-import com.wulong.dict.data.local.TrieIndex
+import com.wulong.dict.data.local.SqliteDictEngine
 import com.wulong.dict.data.repository.DictionaryRepositoryImpl
 import com.wulong.dict.data.repository.HistoryRepositoryImpl
 import com.wulong.dict.domain.repository.DictionaryRepository
@@ -18,7 +17,7 @@ import java.io.File
 class AppContainer(context: Context) {
 
     private val appContext = context.applicationContext
-    private val assetsDir = appContext.filesDir.resolve("dict_indices")
+    private val dictRootDir = appContext.getExternalFilesDir(null)!!.resolve("Dictionary")
 
     // ── Data layer ──────────────────────────────────────────────────────
 
@@ -26,8 +25,7 @@ class AppContainer(context: Context) {
     val database: AppDatabase = AppDatabase.getInstance(appContext)
     private val historyDao = database.searchHistoryDao()
 
-    val mdxEngine: MdxEngine = MdxEngine(appContext.assets, assetsDir)
-    val trieIndex: TrieIndex = TrieIndex()
+    val dictEngine: SqliteDictEngine = SqliteDictEngine(dictRootDir)
 
     // ── WebView pool ──────────────────────────────────────────────────────
 
@@ -35,8 +33,8 @@ class AppContainer(context: Context) {
 
     /** Dict ID → local directory containing CSS/JS/PNG resources. */
     val dictDirs: Map<Int, File>
-        get() = MdxEngine.DICTIONARIES.mapNotNull { config ->
-            mdxEngine.getDictDir(config.id)?.let { config.id to it }
+        get() = SqliteDictEngine.DICTIONARIES.mapNotNull { config ->
+            dictEngine.getResourceDir(config.id)?.let { config.id to it }
         }.toMap()
 
     // ── Repositories ────────────────────────────────────────────────────
@@ -44,8 +42,7 @@ class AppContainer(context: Context) {
     private val ioDispatcher = kotlinx.coroutines.Dispatchers.IO
 
     val dictionaryRepository: DictionaryRepository = DictionaryRepositoryImpl(
-        mdxEngine = mdxEngine,
-        trieIndex = trieIndex,
+        dictEngine = dictEngine,
         ioDispatcher = ioDispatcher
     )
 

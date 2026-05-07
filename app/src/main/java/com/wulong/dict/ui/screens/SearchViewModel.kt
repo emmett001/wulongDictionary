@@ -44,6 +44,7 @@ class SearchViewModel(
 
     private val queryFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private var suggestionJob: Job? = null
+    private var searchJob: Job? = null
 
     // ── Initialization ───────────────────────────────────────────────────
 
@@ -117,7 +118,8 @@ class SearchViewModel(
             )
         }
 
-        viewModelScope.launch {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
             try {
                 val results = searchWord(trimmed)
                 _uiState.update {
@@ -141,10 +143,18 @@ class SearchViewModel(
         }
     }
 
-    /** Clear search results and go back to idle state. */
+    /** Clear query text, cancel pending search, reset to idle state. */
     fun onClear() {
+        searchJob?.cancel()
+        suggestionJob?.cancel()
         _uiState.update {
-            UiState(history = it.history, isInitializing = false, showHistory = true)
+            it.copy(
+                query = "",
+                suggestions = emptyList(),
+                showHistory = true,
+                isSearching = false,
+                shouldNavigateToEntry = false,
+            )
         }
     }
 

@@ -2,7 +2,12 @@ package com.wulong.dict.ui.pool
 
 import android.content.Context
 import android.view.ViewGroup
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import java.io.ByteArrayInputStream
+import java.io.File
 import java.util.Stack
 
 /**
@@ -12,10 +17,33 @@ import java.util.Stack
  * Chromium rendering engine is already initialized when EntryScreen needs a WebView,
  * avoiding the typical 200-400ms cold-start penalty.
  */
-class WebViewPool(private val appContext: Context, private val maxPoolSize: Int = 2) {
-
+class WebViewPool(
+    private val appContext: Context,
+    private val maxPoolSize: Int = 2
+) {
     private val available = Stack<WebView>()
     private val lock = Any()
+
+    /** 1×1 transparent PNG — served as fallback for missing images. */
+    private val transparentPixel = byteArrayOf(
+        0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15.toByte(), 0xC4.toByte(), 0x89.toByte(),
+        0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C.toByte(),
+        0x62, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE5.toByte(), 0x27.toByte(),
+        0xDE.toByte(), 0x1F.toByte(), 0xC5.toByte(),
+        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE.toByte(), 0x42, 0x60,
+        0x82.toByte()
+    )
+
+    private fun imageMime(path: String): String = when {
+        path.endsWith(".png", ignoreCase = true) -> "image/png"
+        path.endsWith(".jpg", ignoreCase = true) || path.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+        path.endsWith(".gif", ignoreCase = true) -> "image/gif"
+        path.endsWith(".svg", ignoreCase = true) -> "image/svg+xml"
+        path.endsWith(".webp", ignoreCase = true) -> "image/webp"
+        else -> "application/octet-stream"
+    }
 
     /**
      * Pre-initialize [count] WebView instances on the main thread.
@@ -68,7 +96,38 @@ class WebViewPool(private val appContext: Context, private val maxPoolSize: Int 
                 useWideViewPort = true
                 setSupportZoom(true)
                 allowFileAccess = true
+                @Suppress("DEPRECATION")
+                allowFileAccessFromFileURLs = true
+                @Suppress("DEPRECATION")
+                allowUniversalAccessFromFileURLs = true
+                mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            }
+
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    request: WebResourceRequest?
+                ): WebResourceResponse? {
+                    val url = request?.url ?: return null
+                    if (url.scheme != "file") return null
+
+                    val path = url.path ?: return null
+
+                    // Only intercept image/icon requests
+                    if (!imageMime(path).startsWith("image/")) return null
+
+                    // If the file exists on disk, let it load normally
+                    if (File(path).exists()) return null
+
+                    // File not on disk (likely inside .mdd archive):
+                    // Return 1×1 transparent PNG to prevent broken-image icon
+                    return WebResourceResponse(
+                        "image/png", "UTF-8",
+                        ByteArrayInputStream(transparentPixel)
+                    )
+                }
             }
         }
     }
 }
+

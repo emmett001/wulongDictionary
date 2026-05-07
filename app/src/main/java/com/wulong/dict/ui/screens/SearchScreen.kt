@@ -208,6 +208,10 @@ fun SearchScreen(
                         )
                     }
                 }
+
+                else -> {
+                    // Fallback: empty idle state — nothing to show yet, but prevents whiteout
+                }
             }
         }
     }
