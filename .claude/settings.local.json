@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"E:/AAA_VSCode/乌龙词典v1/app/src/main/java/com/wulong/dict/ui/theme\")",
+      "Bash(mkdir -p \"E:/AAA_VSCode/乌龙词典v1/app/src/main/java/com/wulong/dict/ui/screens\")",
+      "Bash(mkdir -p \"E:/AAA_VSCode/乌龙词典v1/app/src/main/java/com/wulong/dict/data/local\")",
+      "Bash(mkdir -p \"E:/AAA_VSCode/乌龙词典v1/app/src/main/java/com/wulong/dict/data/repository\")",
+      "Bash(mkdir -p \"E:/AAA_VSCode/乌龙词典v1/app/src/main/java/com/wulong/dict/domain/model\")",
+      "Bash(cp -r \"E:/AAA_VSCode/乌龙词典v1/词典/牛津高阶双解词典\" \"E:/AAA_VSCode/乌龙词典v1/app/src/main/assets/dictionaries/\")",
+      "Bash(cp -r \"E:/AAA_VSCode/乌龙词典v1/词典/柯林斯高阶双解词典\" \"E:/AAA_VSCode/乌龙词典v1/app/src/main/assets/dictionaries/\")",
+      "Bash(cp -r \"E:/AAA_VSCode/乌龙词典v1/词典/韦氏大学词典\" \"E:/AAA_VSCode/乌龙词典v1/app/src/main/assets/dictionaries/\")",
+      "Bash(mv \"E:/AAA_VSCode/乌龙词典v1/app/src/main/assets/dictionaries/牛津高阶双解词典\" \"E:/AAA_VSCode/_dict_temp_牛津\")",
+      "Bash(mv \"E:/AAA_VSCode/乌龙词典v1/app/src/main/assets/dictionaries/柯林斯高阶双解词典\" \"E:/AAA_VSCode/_dict_temp_柯林斯\")",
+      "Bash(mv \"E:/AAA_VSCode/乌龙词典v1/app/src/main/assets/dictionaries/韦氏大学词典\" \"E:/AAA_VSCode/_dict_temp_韦氏\")",
+      "Bash(curl -L -o \"E:/AAA_VSCode/wulongDictionary/app/src/main/res/font/playfair_display_regular.ttf\" \"https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf\")",
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(adb install *)",
+      "Bash(C:/Users/Lenovo-pc/AppData/Local/Android/Sdk/platform-tools/adb install *)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}
