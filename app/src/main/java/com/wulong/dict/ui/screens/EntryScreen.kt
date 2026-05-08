@@ -29,7 +29,6 @@ import com.wulong.dict.domain.model.DictionaryEntry
 import com.wulong.dict.ui.pool.WebViewPool
 import kotlinx.coroutines.launch
 import java.io.File
-import kotlin.math.abs
 
 private data class DictTab(
     val id: Int,
@@ -127,12 +126,13 @@ fun EntryScreen(
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             // ── Pager: swipeable dictionary pages ──────────────────────
+            // Gesture arbitration is handled natively by NestedScrollWebView
+            // via requestDisallowInterceptTouchEvent — no Compose-level
+            // filter or userScrollEnabled gating needed.
             HorizontalPager(
                 state = pagerState,
                 beyondBoundsPageCount = 1,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(rememberGestureFilter())
+                modifier = Modifier.fillMaxSize()
             ) { pageIndex ->
                 val tab = DICT_TABS[pageIndex]
                 val entry = results.firstOrNull { it.dictionaryId == tab.id }
@@ -288,68 +288,6 @@ private fun rememberNestedScrollInterop(): NestedScrollConnection {
                 consumed: Velocity,
                 available: Velocity
             ): Velocity = Velocity(0f, available.y)
-        }
-    }
-}
-
-// ─── Gesture filter: only purely horizontal swipes can trigger tab switch ─────
-
-/**
- * A [NestedScrollConnection] that filters both scroll deltas (drag phase)
- * and fling velocities (inertial phase) before they reach [HorizontalPager].
- *
- * Only swipes with effectively zero vertical component qualify as intentional
- * tab switches.  Every other drag is treated as vertical scrolling — the
- * horizontal component is consumed here so the pager never sees it, and the
- * vertical component passes through to the WebView intact.
- *
- * Separate thresholds for delta (pixels/frame) vs velocity (pixels/second)
- * because their value ranges differ by orders of magnitude.
- *
- * All four nested-scroll methods are overridden because the HorizontalPager
- * can hijack horizontal leftovers at any stage:
- * - [onPreScroll]  – blocks horizontal delta during active drag
- * - [onPostScroll] – blocks horizontal leftovers the WebView didn't consume
- * - [onPreFling]   – blocks horizontal velocity before the pager starts a
- *                    page-change animation (would otherwise consume the
- *                    entire fling, killing WebView momentum)
- * - [onPostFling]  – blocks horizontal velocity leftovers
- */
-@Composable
-private fun rememberGestureFilter(): NestedScrollConnection {
-    return remember {
-        object : NestedScrollConnection {
-
-            // ── Drag phase (pixels per frame) ─────────────────────────────
-
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (abs(available.y) < 1f) return Offset.Zero
-                return Offset(available.x, 0f)
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (abs(available.y) < 1f) return Offset.Zero
-                return Offset(available.x, 0f)
-            }
-
-            // ── Fling phase (pixels per second) ───────────────────────────
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                if (abs(available.y) < abs(available.x) * 0.02f) return Velocity.Zero
-                return Velocity(available.x, 0f)
-            }
-
-            override suspend fun onPostFling(
-                consumed: Velocity,
-                available: Velocity
-            ): Velocity {
-                if (abs(available.y) < abs(available.x) * 0.02f) return Velocity.Zero
-                return Velocity(available.x, 0f)
-            }
         }
     }
 }
