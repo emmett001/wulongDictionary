@@ -36,6 +36,7 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
         ) {
             // ── Upper breathing space → pushes logo above midline ───
             Spacer(modifier = Modifier.weight(0.3f))
+            Spacer(modifier = Modifier.height(120.dp))
 
             // ── Logo ─────────────────────────────────────────────────
             Image(
@@ -61,7 +62,7 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
             Spacer(modifier = Modifier.weight(0.02f))
 
             // ── Extra offset ─────────────────────────────────────────
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(180.dp))
 
             // ── Cream pill search bar ────────────────────────────────
             Surface(
