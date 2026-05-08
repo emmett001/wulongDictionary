@@ -40,9 +40,10 @@ class PagerAwareWebView @JvmOverloads constructor(
                 if (!isHorizontalSwipe && !isVerticalSwipe) {
                     if (dx > touchSlop || dy > touchSlop) {
                         // Only when horizontal intent is unambiguous
-                        // (dx > dy * 1.5) release to the Compose Pager.
-                        // Everything else stays in the WebView.
-                        if (dx > dy * 1.5f) {
+                        // (dx > dy * 5729.58, i.e. angle ≤ 0.01° from horizontal)
+                        // release to the Compose Pager. Everything else stays
+                        // in the WebView.
+                        if (dx > dy * 5729.58f) {
                             isHorizontalSwipe = true
                             parent?.requestDisallowInterceptTouchEvent(false)
                         } else {

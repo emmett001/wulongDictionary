@@ -18,6 +18,7 @@ import com.wulong.dict.ui.screens.EntryScreen
 import com.wulong.dict.ui.screens.MainScreen
 import com.wulong.dict.ui.screens.SearchScreen
 import com.wulong.dict.ui.screens.SearchViewModel
+import com.wulong.dict.ui.screens.SettingsScreen
 import com.wulong.dict.ui.theme.WulongDictTheme
 
 class MainActivity : ComponentActivity() {
@@ -60,7 +61,16 @@ class MainActivity : ComponentActivity() {
                             onNavigateToSearch = {
                                 viewModel.onEnterSearch()
                                 navController.navigate(NavRoutes.SEARCH)
+                            },
+                            onNavigateToSettings = {
+                                navController.navigate(NavRoutes.SETTINGS)
                             }
+                        )
+                    }
+                    composable(NavRoutes.SETTINGS) {
+                        SettingsScreen(
+                            appContainer = container,
+                            onNavigateBack = { navController.popBackStack() }
                         )
                     }
                     composable(NavRoutes.SEARCH) {

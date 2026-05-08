@@ -35,6 +35,14 @@ android {
         }
     }
 
+    // Rename APK output files
+    applicationVariants.all {
+        outputs.all {
+            val variant = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            variant.outputFileName = "乌龙词典.apk"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -92,6 +100,9 @@ dependencies {
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // DocumentFile (SAF folder access for dictionary import)
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     // Core KTX
     implementation("androidx.core:core-ktx:1.12.0")

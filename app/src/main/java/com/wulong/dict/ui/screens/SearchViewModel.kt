@@ -153,7 +153,15 @@ class SearchViewModel(
         searchJob?.cancel()
         suggestionJob?.cancel()
         _uiState.update {
-            UiState(isInitializing = it.isInitializing, initError = it.initError)
+            it.copy(
+                query = "",
+                suggestions = emptyList(),
+                results = emptyList(),
+                isSearching = false,
+                showHistory = false,
+                shouldNavigateToEntry = false,
+                activeDictId = 0,
+            )
         }
     }
 

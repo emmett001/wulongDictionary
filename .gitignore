@@ -14,3 +14,11 @@
 *.keystore
 /venv/
 /词典/
+/Dictionary/
+/app/release/
+*.ico
+*.py
+DEBUG.md
+UI_OVERVIEW.md
+技术栈.png
+.claude/

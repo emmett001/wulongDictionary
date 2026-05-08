@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,7 +23,7 @@ import com.wulong.dict.ui.theme.WulongColors
 import com.wulong.dict.ui.theme.WulongFonts
 
 @Composable
-fun MainScreen(onNavigateToSearch: () -> Unit) {
+fun MainScreen(onNavigateToSearch: () -> Unit, onNavigateToSettings: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -30,6 +31,20 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
+        // ── Settings gear (top-right) ──────────────────────────────
+        IconButton(
+            onClick = onNavigateToSettings,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 8.dp, top = 4.dp)
+        ) {
+            Icon(
+                Icons.Default.Settings,
+                contentDescription = "设置",
+                tint = WulongColors.Placeholder,
+                modifier = Modifier.size(22.dp)
+            )
+        }
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
