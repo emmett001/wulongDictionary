@@ -28,8 +28,10 @@ class PagerAwareWebView @JvmOverloads constructor(
                 startY = event.y
                 isHorizontalSwipe = false
                 isVerticalSwipe = false
-                // Hold events by default — don't let Pager intercept
-                parent?.requestDisallowInterceptTouchEvent(true)
+                // Do NOT call requestDisallowInterceptTouchEvent here —
+                // pre-emptively blocking the Compose pointer stream prevents
+                // the Pager from ever seeing the gesture, even if we later
+                // release it.  Direction is arbitrated in ACTION_MOVE below.
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = abs(event.x - startX)
