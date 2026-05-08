@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.wulong.dict.domain.model.DictionaryEntry
 import com.wulong.dict.ui.pool.WebViewPool
+import com.wulong.dict.ui.theme.WulongColors
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -57,6 +58,7 @@ fun EntryScreen(
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
+        containerColor = WulongColors.Background,
         topBar = {
             TopAppBar(
                 title = {
@@ -64,7 +66,8 @@ fun EntryScreen(
                         text = word,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(onClick = onSearchWordClick)
+                        modifier = Modifier.clickable(onClick = onSearchWordClick),
+                        color = WulongColors.BodyText
                     )
                 },
                 navigationIcon = {
@@ -72,22 +75,22 @@ fun EntryScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = WulongColors.BodyText
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = WulongColors.Background,
+                    titleContentColor = WulongColors.BodyText
                 )
             )
         }
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            // ── Tab row: equal-width, 16sp+, accent indicator ──────────
+            // ── Tab row: equal-width, 16sp+, warm accent ──────────────
             TabRow(
                 selectedTabIndex = pagerState.currentPage,
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = WulongColors.Background,
                 indicator = { tabPositions ->
                     if (pagerState.currentPage < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
@@ -112,18 +115,17 @@ fun EntryScreen(
                                 text = tab.shortName,
                                 fontSize = 17.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onSurface.copy(
-                                    alpha = if (selected) 1f else 0.6f
-                                )
+                                color = if (selected) WulongColors.BodyText
+                                        else WulongColors.Placeholder
                             )
                         },
                         selectedContentColor = MaterialTheme.colorScheme.primary,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        unselectedContentColor = WulongColors.Placeholder
                     )
                 }
             }
 
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(thickness = 0.5.dp, color = WulongColors.SearchFill)
 
             // ── Pager: swipeable dictionary pages ──────────────────────
             // Gesture arbitration is handled natively by NestedScrollWebView
@@ -168,7 +170,7 @@ private fun DictPage(
             Text(
                 text = "未收录此词",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = WulongColors.Placeholder
             )
         }
         return

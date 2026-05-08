@@ -20,13 +20,28 @@ object WulongFonts {
     )
 }
 
+// ── Brand palette ─────────────────────────────────────────────────────────
+// Warm, paper-like, restrained — "oolong tea dictionary" aesthetic.
+object WulongColors {
+    /** Page background: warm paper-white */
+    val Background = Color(0xFFFDFBF7)
+    /** Card / search-bar surface: light cream */
+    val Surface = Color(0xFFF7F3E8)
+    /** Search-bar fill: warm cream */
+    val SearchFill = Color(0xFFF5F1E6)
+    /** Subtle warm gray for placeholder text */
+    val Placeholder = Color(0xFFA8A29B)
+    /** Soft dark for body text (not pure black) */
+    val BodyText = Color(0xFF3A3A3A)
+}
+
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFF5B3E96),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFEADDFF),
     secondary = Color(0xFF625B71),
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    background = WulongColors.Background,
+    surface = WulongColors.Surface,
 )
 
 private val DarkColorScheme = darkColorScheme(

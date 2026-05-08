@@ -1,10 +1,13 @@
 package com.wulong.dict.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -20,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
@@ -28,8 +32,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.wulong.dict.domain.model.SearchHistory
 import com.wulong.dict.domain.model.Suggestion
+import com.wulong.dict.ui.theme.WulongColors
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -105,6 +111,7 @@ fun SearchScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = WulongColors.Background,
         topBar = {
             TopAppBar(
                 title = { },
@@ -113,13 +120,13 @@ fun SearchScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = WulongColors.BodyText
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = WulongColors.Background,
+                    titleContentColor = WulongColors.BodyText
                 )
             )
         }
@@ -129,24 +136,31 @@ fun SearchScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // ── Search bar ──────────────────────────────────────────────
+            // ── Immersive cream pill search bar ───────────────────────
             OutlinedTextField(
                 value = textFieldValue,
                 onValueChange = { newValue ->
                     textFieldValue = newValue
                     viewModel.onQueryChange(newValue.text)
                 },
-                placeholder = { Text("输入单词查询…") },
+                placeholder = {
+                    Text(
+                        "输入单词以查询…",
+                        color = WulongColors.Placeholder,
+                        fontSize = 15.sp
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = WulongColors.BodyText,
+                    fontSize = 16.sp
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
                     .focusRequester(searchFieldFocusRequester)
                     .onFocusChanged { focusState ->
                         if (focusState.isFocused) {
                             viewModel.onSearchFieldFocused()
-                            // Auto-select-all: if field was unfocused and now
-                            // focused with text, select entire content so the
-                            // user can overwrite in one keystroke.
                             if (!wasFocused && textFieldValue.text.isNotEmpty()) {
                                 textFieldValue = textFieldValue.copy(
                                     selection = TextRange(0, textFieldValue.text.length)
@@ -159,8 +173,21 @@ fun SearchScreen(
                         }
                     },
                 singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = WulongColors.SearchFill,
+                    unfocusedContainerColor = WulongColors.SearchFill,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    cursorColor = WulongColors.BodyText,
+                ),
                 leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = "搜索")
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = "搜索",
+                        tint = WulongColors.Placeholder,
+                        modifier = Modifier.size(22.dp)
+                    )
                 },
                 trailingIcon = {
                     if (textFieldValue.text.isNotEmpty()) {
@@ -169,7 +196,11 @@ fun SearchScreen(
                             textFieldValue = TextFieldValue("")
                             searchFieldFocusRequester.requestFocus()
                         }) {
-                            Icon(Icons.Default.Clear, contentDescription = "清除")
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "清除",
+                                tint = WulongColors.Placeholder
+                            )
                         }
                     }
                 },
@@ -250,7 +281,7 @@ fun SearchScreen(
                         Text(
                             "未找到「${textFieldValue.text}」的相关结果",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = WulongColors.Placeholder
                         )
                     }
                 }
@@ -293,13 +324,13 @@ private fun HistoryPanel(
             Text(
                 "搜索历史",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = WulongColors.Placeholder
             )
             IconButton(onClick = onClearAll) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "清空全部",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = WulongColors.Placeholder
                 )
             }
         }
@@ -322,7 +353,7 @@ private fun HistoryPanel(
                             Icons.Default.History,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = WulongColors.Placeholder
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
@@ -386,12 +417,13 @@ private fun SuggestionsDropdown(
                     Text(
                         text = sug.keyword,
                         style = MaterialTheme.typography.bodyLarge,
+                        color = WulongColors.BodyText,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = sug.dictionaryLabel,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = WulongColors.Placeholder
                     )
                 }
                 HorizontalDivider()

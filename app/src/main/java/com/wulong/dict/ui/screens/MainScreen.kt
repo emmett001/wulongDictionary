@@ -12,12 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wulong.dict.R
+import com.wulong.dict.ui.theme.WulongColors
 import com.wulong.dict.ui.theme.WulongFonts
 
 @Composable
@@ -25,72 +26,76 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(WulongColors.Background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(48.dp))
+            // ── Upper breathing space → pushes logo to ~42% ──────────
+            Spacer(modifier = Modifier.weight(0.72f))
 
-            // ── Search bar (non-focusable, navigates on click) ────────
+            // ── Logo ─────────────────────────────────────────────────
+            Image(
+                painter = painterResource(R.drawable.app_logo),
+                contentDescription = "乌龙词典",
+                modifier = Modifier.size(88.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Slogan — literary, restrained ────────────────────────
+            Text(
+                text = "Words build worlds.",
+                fontFamily = WulongFonts.PlayfairDisplay,
+                fontWeight = FontWeight.Normal,
+                fontSize = 18.sp,
+                color = WulongColors.Placeholder,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center
+            )
+
+            // ── Breathing space between brand and search ─────────────
+            Spacer(modifier = Modifier.weight(1.08f))
+
+            // ── Cream pill search bar ────────────────────────────────
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 28.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .clickable(onClick = onNavigateToSearch),
                 shape = RoundedCornerShape(28.dp),
-                shadowElevation = 2.dp,
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp
+                shadowElevation = 0.dp,
+                color = WulongColors.SearchFill,
+                tonalElevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                        .padding(horizontal = 22.dp, vertical = 17.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        tint = WulongColors.Placeholder,
+                        modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "查点什么好呢？",
+                        text = "输入单词以查询…",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        fontSize = 16.sp
+                        color = WulongColors.Placeholder,
+                        fontSize = 15.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // ── App Logo ──────────────────────────────────────────────
-            Image(
-                painter = painterResource(R.drawable.app_logo),
-                contentDescription = "乌龙词典",
-                modifier = Modifier.size(100.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ── Slogan ────────────────────────────────────────────────
-            Text(
-                text = "Words build worlds.",
-                fontFamily = WulongFonts.PlayfairDisplay,
-                fontWeight = FontWeight.Normal,
-                fontSize = 20.sp,
-                color = Color(0xFF3A3A3A),
-                letterSpacing = 0.5.sp
-            )
-
-            Spacer(modifier = Modifier.weight(1.2f))
+            // ── Bottom breathing space ───────────────────────────────
+            Spacer(modifier = Modifier.weight(0.9f))
         }
     }
 }
