@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -20,7 +21,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wulong.dict.domain.model.SearchHistory
@@ -37,10 +42,22 @@ fun SearchScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val searchFieldFocusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showClearAllDialog by remember { mutableStateOf(false) }
+
+    // ── TextFieldValue wrapper for auto-select-all on focus ──────────
+    var textFieldValue by remember { mutableStateOf(TextFieldValue(state.query)) }
+    var wasFocused by remember { mutableStateOf(false) }
+
+    // Sync external query changes (e.g. onClear, onSearch) into TextFieldValue
+    LaunchedEffect(state.query) {
+        if (textFieldValue.text != state.query) {
+            textFieldValue = TextFieldValue(state.query)
+        }
+    }
 
     // Auto-focus the search field when screen appears
     LaunchedEffect(Unit) {
@@ -50,6 +67,7 @@ fun SearchScreen(
     // Navigate to EntryScreen when search results arrive
     LaunchedEffect(state.shouldNavigateToEntry) {
         if (state.shouldNavigateToEntry) {
+            keyboardController?.hide()
             onNavigateToEntry(state.query)
             viewModel.onNavigatedToEntry()
         }
@@ -113,25 +131,42 @@ fun SearchScreen(
         ) {
             // ── Search bar ──────────────────────────────────────────────
             OutlinedTextField(
-                value = state.query,
-                onValueChange = viewModel::onQueryChange,
+                value = textFieldValue,
+                onValueChange = { newValue ->
+                    textFieldValue = newValue
+                    viewModel.onQueryChange(newValue.text)
+                },
                 placeholder = { Text("输入单词查询…") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .focusRequester(searchFieldFocusRequester)
                     .onFocusChanged { focusState ->
-                        if (focusState.isFocused) viewModel.onSearchFieldFocused()
-                        else viewModel.onSearchFieldBlurred()
+                        if (focusState.isFocused) {
+                            viewModel.onSearchFieldFocused()
+                            // Auto-select-all: if field was unfocused and now
+                            // focused with text, select entire content so the
+                            // user can overwrite in one keystroke.
+                            if (!wasFocused && textFieldValue.text.isNotEmpty()) {
+                                textFieldValue = textFieldValue.copy(
+                                    selection = TextRange(0, textFieldValue.text.length)
+                                )
+                            }
+                            wasFocused = true
+                        } else {
+                            viewModel.onSearchFieldBlurred()
+                            wasFocused = false
+                        }
                     },
                 singleLine = true,
                 leadingIcon = {
                     Icon(Icons.Default.Search, contentDescription = "搜索")
                 },
                 trailingIcon = {
-                    if (state.query.isNotEmpty()) {
+                    if (textFieldValue.text.isNotEmpty()) {
                         IconButton(onClick = {
                             viewModel.onClear()
+                            textFieldValue = TextFieldValue("")
                             searchFieldFocusRequester.requestFocus()
                         }) {
                             Icon(Icons.Default.Clear, contentDescription = "清除")
@@ -142,7 +177,7 @@ fun SearchScreen(
                 keyboardActions = KeyboardActions(
                     onSearch = {
                         focusManager.clearFocus()
-                        viewModel.onSearch(state.query)
+                        viewModel.onSearch(textFieldValue.text)
                     }
                 )
             )
@@ -179,19 +214,27 @@ fun SearchScreen(
                     }
                 }
 
-                state.showHistory && state.query.isEmpty() && state.history.isNotEmpty() -> {
+                state.showHistory && textFieldValue.text.isEmpty() && state.history.isNotEmpty() -> {
                     HistoryPanel(
                         history = state.history,
-                        onItemClick = { word -> viewModel.onSearch(word) },
+                        onItemClick = { word ->
+                            keyboardController?.hide()
+                            viewModel.onSearch(word)
+                        },
                         onDelete = { id -> viewModel.onDeleteHistory(id) },
-                        onClearAll = { showClearAllDialog = true }
+                        onClearAll = { showClearAllDialog = true },
+                        keyboardController = keyboardController
                     )
                 }
 
                 state.suggestions.isNotEmpty() && state.results.isEmpty() -> {
                     SuggestionsDropdown(
                         suggestions = state.suggestions,
-                        onSuggestionClick = { sug -> viewModel.onSearch(sug.keyword, sug.dictionaryId) }
+                        onSuggestionClick = { sug ->
+                            keyboardController?.hide()
+                            viewModel.onSearch(sug.keyword, sug.dictionaryId)
+                        },
+                        keyboardController = keyboardController
                     )
                 }
 
@@ -199,13 +242,13 @@ fun SearchScreen(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
 
-                state.query.isNotBlank() && !state.isSearching && state.results.isEmpty() -> {
+                textFieldValue.text.isNotBlank() && !state.isSearching && state.results.isEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "未找到「${state.query}」的相关结果",
+                            "未找到「${textFieldValue.text}」的相关结果",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -228,7 +271,17 @@ private fun HistoryPanel(
     onItemClick: (String) -> Unit,
     onDelete: (Long) -> Unit,
     onClearAll: () -> Unit,
+    keyboardController: SoftwareKeyboardController?,
 ) {
+    val listState = rememberLazyListState()
+
+    // Hide keyboard when the user starts scrolling the history list
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            keyboardController?.hide()
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -251,7 +304,7 @@ private fun HistoryPanel(
             }
         }
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
             items(history, key = { it.id }) { item ->
                 Row(
                     modifier = Modifier
@@ -304,14 +357,23 @@ private fun HistoryPanel(
 private fun SuggestionsDropdown(
     suggestions: List<Suggestion>,
     onSuggestionClick: (Suggestion) -> Unit,
+    keyboardController: SoftwareKeyboardController?,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            keyboardController?.hide()
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+        LazyColumn(modifier = Modifier.heightIn(max = 300.dp), state = listState) {
             items(suggestions.take(20)) { sug ->
                 Row(
                     modifier = Modifier

@@ -148,6 +148,15 @@ class SearchViewModel(
         }
     }
 
+    /** Full reset when entering SearchScreen from MainScreen — wipe ghost state. */
+    fun onEnterSearch() {
+        searchJob?.cancel()
+        suggestionJob?.cancel()
+        _uiState.update {
+            UiState(isInitializing = it.isInitializing, initError = it.initError)
+        }
+    }
+
     /** Clear query text, cancel pending search, reset to idle state. */
     fun onClear() {
         searchJob?.cancel()

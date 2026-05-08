@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
                     composable(NavRoutes.MAIN) {
                         MainScreen(
                             onNavigateToSearch = {
+                                viewModel.onEnterSearch()
                                 navController.navigate(NavRoutes.SEARCH)
                             }
                         )
@@ -68,7 +69,12 @@ class MainActivity : ComponentActivity() {
                             viewModel = viewModel,
                             onNavigateBack = { navController.popBackStack() },
                             onNavigateToEntry = { word ->
-                                navController.navigate(NavRoutes.ENTRY)
+                                navController.navigate(NavRoutes.ENTRY) {
+                                    // Keep at most one ENTRY on top of SEARCH —
+                                    // prevents back-stack nesting from repeated searches.
+                                    popUpTo(NavRoutes.SEARCH)
+                                    launchSingleTop = true
+                                }
                             }
                         )
                     }
