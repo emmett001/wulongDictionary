@@ -256,43 +256,38 @@ private fun loadEntryHtml(webView: WebView, entry: DictionaryEntry, dictDir: Fil
     )
 }
 
-// ─── Gesture filter: only ≤15° horizontal swipes can trigger tab switch ──────
+// ─── Gesture filter: only purely horizontal swipes can trigger tab switch ─────
 
 /**
  * A [NestedScrollConnection] that filters both scroll deltas (drag phase)
  * and fling velocities (inertial phase) before they reach [HorizontalPager].
  *
- * Only drags within 15° of the horizontal axis qualify as intentional tab
- * swipes (tan 15° ≈ 0.2679, i.e. absY ≤ absX × 0.2679).  Every other drag
- * is treated as vertical scrolling — the horizontal component is consumed
- * here so the pager never sees it, and the vertical component passes through
- * to the WebView intact.
+ * Only swipes with effectively zero vertical component qualify as intentional
+ * tab switches.  Every other drag is treated as vertical scrolling — the
+ * horizontal component is consumed here so the pager never sees it, and the
+ * vertical component passes through to the WebView intact.
+ *
+ * Separate thresholds for delta (pixels/frame) vs velocity (pixels/second)
+ * because their value ranges differ by orders of magnitude.
  *
  * All four nested-scroll methods are overridden because the HorizontalPager
  * can hijack horizontal leftovers at any stage:
  * - [onPreScroll]  – blocks horizontal delta during active drag
  * - [onPostScroll] – blocks horizontal leftovers the WebView didn't consume
  * - [onPreFling]   – blocks horizontal velocity before the pager starts a
- *                    page-change animation (the primary cause of choppy
- *                    vertical scrolling: the pager would otherwise consume
- *                    the entire fling, killing WebView momentum)
+ *                    page-change animation (would otherwise consume the
+ *                    entire fling, killing WebView momentum)
  * - [onPostFling]  – blocks horizontal velocity leftovers
  */
 @Composable
 private fun rememberGestureFilter(): NestedScrollConnection {
     return remember {
-        // tan(15°) — swipe must stay inside this vertical/horizontal ratio to
-        // be recognised as a deliberate tab switch.
-        val tan15 = 0.267949f
-
         object : NestedScrollConnection {
 
-            // ── Drag phase ────────────────────────────────────────────────
+            // ── Drag phase (pixels per frame) ─────────────────────────────
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val absX = abs(available.x)
-                val absY = abs(available.y)
-                if (absY <= absX * tan15) return Offset.Zero
+                if (abs(available.y) < 1f) return Offset.Zero
                 return Offset(available.x, 0f)
             }
 
@@ -301,18 +296,14 @@ private fun rememberGestureFilter(): NestedScrollConnection {
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                val absX = abs(available.x)
-                val absY = abs(available.y)
-                if (absY <= absX * tan15) return Offset.Zero
+                if (abs(available.y) < 1f) return Offset.Zero
                 return Offset(available.x, 0f)
             }
 
-            // ── Fling (inertial) phase ────────────────────────────────────
+            // ── Fling phase (pixels per second) ───────────────────────────
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                val absX = abs(available.x)
-                val absY = abs(available.y)
-                if (absY <= absX * tan15) return Velocity.Zero
+                if (abs(available.y) < abs(available.x) * 0.02f) return Velocity.Zero
                 return Velocity(available.x, 0f)
             }
 
@@ -320,9 +311,7 @@ private fun rememberGestureFilter(): NestedScrollConnection {
                 consumed: Velocity,
                 available: Velocity
             ): Velocity {
-                val absX = abs(available.x)
-                val absY = abs(available.y)
-                if (absY <= absX * tan15) return Velocity.Zero
+                if (abs(available.y) < abs(available.x) * 0.02f) return Velocity.Zero
                 return Velocity(available.x, 0f)
             }
         }
