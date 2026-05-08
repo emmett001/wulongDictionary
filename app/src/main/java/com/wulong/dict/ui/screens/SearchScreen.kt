@@ -130,7 +130,10 @@ fun SearchScreen(
                 },
                 trailingIcon = {
                     if (state.query.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onClear() }) {
+                        IconButton(onClick = {
+                            viewModel.onClear()
+                            searchFieldFocusRequester.requestFocus()
+                        }) {
                             Icon(Icons.Default.Clear, contentDescription = "清除")
                         }
                     }
@@ -188,7 +191,7 @@ fun SearchScreen(
                 state.suggestions.isNotEmpty() && state.results.isEmpty() -> {
                     SuggestionsDropdown(
                         suggestions = state.suggestions,
-                        onSuggestionClick = { sug -> viewModel.onSearch(sug.keyword) }
+                        onSuggestionClick = { sug -> viewModel.onSearch(sug.keyword, sug.dictionaryId) }
                     )
                 }
 

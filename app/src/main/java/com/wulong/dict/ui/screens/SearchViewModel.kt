@@ -35,6 +35,8 @@ class SearchViewModel(
         val searchError: String? = null,
         val showHistory: Boolean = false,
         val shouldNavigateToEntry: Boolean = false,
+        /** Dict tab to focus when entering EntryScreen (set from suggestion click). */
+        val activeDictId: Int = 0,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -84,6 +86,8 @@ class SearchViewModel(
                 suggestions = if (text.length < 2) emptyList() else it.suggestions,
                 results = if (text.isEmpty()) emptyList() else it.results,
                 showHistory = text.isEmpty(),
+                // Defensive: never allow navigation when query is empty
+                shouldNavigateToEntry = if (text.isEmpty()) false else it.shouldNavigateToEntry,
             )
         }
 
@@ -104,7 +108,7 @@ class SearchViewModel(
     }
 
     /** Execute full search (triggered by Enter key or suggestion tap). */
-    fun onSearch(word: String) {
+    fun onSearch(word: String, activeDictId: Int = 0) {
         val trimmed = word.trim()
         if (trimmed.isEmpty()) return
 
@@ -115,6 +119,7 @@ class SearchViewModel(
                 isSearching = true,
                 searchError = null,
                 showHistory = false,
+                activeDictId = activeDictId,
             )
         }
 

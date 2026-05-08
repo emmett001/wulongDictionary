@@ -1,6 +1,8 @@
 package com.wulong.dict.ui.screens
 
+import android.graphics.Bitmap
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -13,8 +15,13 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -22,6 +29,7 @@ import com.wulong.dict.domain.model.DictionaryEntry
 import com.wulong.dict.ui.pool.WebViewPool
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.abs
 
 private data class DictTab(
     val id: Int,
@@ -40,12 +48,13 @@ private val DICT_TABS = listOf(
 fun EntryScreen(
     word: String,
     results: List<DictionaryEntry>,
+    activeDictId: Int,
     onNavigateBack: () -> Unit,
     onSearchWordClick: () -> Unit,
     webViewPool: WebViewPool,
     dictDirs: Map<Int, File>,
 ) {
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 3 }, initialPage = activeDictId)
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
@@ -121,7 +130,9 @@ fun EntryScreen(
             HorizontalPager(
                 state = pagerState,
                 beyondBoundsPageCount = 1,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(rememberGestureFilter())
             ) { pageIndex ->
                 val tab = DICT_TABS[pageIndex]
                 val entry = results.firstOrNull { it.dictionaryId == tab.id }
@@ -164,31 +175,158 @@ private fun DictPage(
     }
 
     val webView = remember { webViewPool.acquire() }
+    var isLoading by remember { mutableStateOf(true) }
+    var hasLoaded by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
-        onDispose { webViewPool.release(webView) }
-    }
-
-    // Load HTML only once when this tab first becomes visible
-    var hasLoaded by remember { mutableStateOf(false) }
-    LaunchedEffect(isCurrentPage) {
-        if (isCurrentPage && !hasLoaded) {
-            val baseUrl = if (dictDir != null) "file://${dictDir.absolutePath}/" else null
-            webView.loadDataWithBaseURL(
-                baseUrl,
-                buildHtml(entry, dictDir),
-                "text/html",
-                "UTF-8",
-                null
-            )
-            hasLoaded = true
+        onDispose {
+            webViewPool.release(webView)
         }
     }
 
-    AndroidView(
-        factory = { webView },
-        modifier = Modifier.fillMaxSize()
+    // Wrap WebViewClient to track page load state while preserving
+    // the pool's request-interception logic (CDN blocking, missing-image fallback).
+    DisposableEffect(webView) {
+        val originalClient = webView.webViewClient
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                isLoading = true
+                originalClient.onPageStarted(view, url, favicon)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                isLoading = false
+                originalClient.onPageFinished(view, url)
+            }
+
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?
+            ): android.webkit.WebResourceResponse? {
+                return originalClient.shouldInterceptRequest(view, request)
+            }
+        }
+        onDispose {
+            // Restore original client so pool gets back a clean WebView
+            webView.webViewClient = originalClient
+        }
+    }
+
+    // Load HTML when this tab becomes visible (or pre-load adjacent tabs).
+    LaunchedEffect(isCurrentPage) {
+        if (!hasLoaded) {
+            if (isCurrentPage) {
+                loadEntryHtml(webView, entry, dictDir)
+                hasLoaded = true
+            } else {
+                // Pre-load adjacent tab after a short delay so the current
+                // tab's rendering isn't competing for resources.
+                kotlinx.coroutines.delay(600)
+                if (!hasLoaded) {
+                    loadEntryHtml(webView, entry, dictDir)
+                    hasLoaded = true
+                }
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { webView },
+            modifier = Modifier.fillMaxSize()
+        )
+        if (isLoading && isCurrentPage) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 3.dp
+            )
+        }
+    }
+}
+
+private fun loadEntryHtml(webView: WebView, entry: DictionaryEntry, dictDir: File?) {
+    val baseUrl = if (dictDir != null) "file://${dictDir.absolutePath}/" else null
+    webView.loadDataWithBaseURL(
+        baseUrl,
+        buildHtml(entry, dictDir),
+        "text/html",
+        "UTF-8",
+        null
     )
+}
+
+// ─── Gesture filter: only ≤15° horizontal swipes can trigger tab switch ──────
+
+/**
+ * A [NestedScrollConnection] that filters both scroll deltas (drag phase)
+ * and fling velocities (inertial phase) before they reach [HorizontalPager].
+ *
+ * Only drags within 15° of the horizontal axis qualify as intentional tab
+ * swipes (tan 15° ≈ 0.2679, i.e. absY ≤ absX × 0.2679).  Every other drag
+ * is treated as vertical scrolling — the horizontal component is consumed
+ * here so the pager never sees it, and the vertical component passes through
+ * to the WebView intact.
+ *
+ * All four nested-scroll methods are overridden because the HorizontalPager
+ * can hijack horizontal leftovers at any stage:
+ * - [onPreScroll]  – blocks horizontal delta during active drag
+ * - [onPostScroll] – blocks horizontal leftovers the WebView didn't consume
+ * - [onPreFling]   – blocks horizontal velocity before the pager starts a
+ *                    page-change animation (the primary cause of choppy
+ *                    vertical scrolling: the pager would otherwise consume
+ *                    the entire fling, killing WebView momentum)
+ * - [onPostFling]  – blocks horizontal velocity leftovers
+ */
+@Composable
+private fun rememberGestureFilter(): NestedScrollConnection {
+    return remember {
+        // tan(15°) — swipe must stay inside this vertical/horizontal ratio to
+        // be recognised as a deliberate tab switch.
+        val tan15 = 0.267949f
+
+        object : NestedScrollConnection {
+
+            // ── Drag phase ────────────────────────────────────────────────
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val absX = abs(available.x)
+                val absY = abs(available.y)
+                if (absY <= absX * tan15) return Offset.Zero
+                return Offset(available.x, 0f)
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                val absX = abs(available.x)
+                val absY = abs(available.y)
+                if (absY <= absX * tan15) return Offset.Zero
+                return Offset(available.x, 0f)
+            }
+
+            // ── Fling (inertial) phase ────────────────────────────────────
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                val absX = abs(available.x)
+                val absY = abs(available.y)
+                if (absY <= absX * tan15) return Velocity.Zero
+                return Velocity(available.x, 0f)
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                val absX = abs(available.x)
+                val absY = abs(available.y)
+                if (absY <= absX * tan15) return Velocity.Zero
+                return Velocity(available.x, 0f)
+            }
+        }
+    }
 }
 
 // ─── HTML builder ─────────────────────────────────────────────────────────

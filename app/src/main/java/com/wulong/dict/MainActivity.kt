@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
                         EntryScreen(
                             word = state.query,
                             results = state.results,
+                            activeDictId = state.activeDictId,
                             onNavigateBack = { navController.popBackStack() },
                             onSearchWordClick = { navController.popBackStack() },
                             webViewPool = container.webViewPool,
