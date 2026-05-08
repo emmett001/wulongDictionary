@@ -88,7 +88,7 @@ class WebViewPool(
     }
 
     private fun createWebView(): WebView {
-        return NestedScrollWebView(appContext).apply {
+        return PagerAwareWebView(appContext).apply {
             // Match content background so unrendered area blends in (no white flash)
             setBackgroundColor(Color.WHITE)
 
