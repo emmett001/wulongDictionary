@@ -61,7 +61,7 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
             Spacer(modifier = Modifier.weight(0.02f))
 
             // ── Extra offset ─────────────────────────────────────────
-            Spacer(modifier = Modifier.height(90.dp))
+            Spacer(modifier = Modifier.height(120.dp))
 
             // ── Cream pill search bar ────────────────────────────────
             Surface(
