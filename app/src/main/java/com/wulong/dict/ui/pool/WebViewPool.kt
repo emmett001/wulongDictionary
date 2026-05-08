@@ -1,6 +1,8 @@
 package com.wulong.dict.ui.pool
 
 import android.content.Context
+import android.graphics.Color
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -87,6 +89,9 @@ class WebViewPool(
 
     private fun createWebView(): WebView {
         return WebView(appContext).apply {
+            // Match content background so unrendered area blends in (no white flash)
+            setBackgroundColor(Color.WHITE)
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -103,12 +108,31 @@ class WebViewPool(
                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
 
+            // Kill overscroll glow to reduce rendering overhead during scroll
+            overScrollMode = View.OVER_SCROLL_NEVER
+            // Dedicated hardware layer avoids re-compositing with Compose on every frame
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
                     view: WebView?,
                     request: WebResourceRequest?
                 ): WebResourceResponse? {
                     val url = request?.url ?: return null
+
+                    // Block CDN requests — return empty immediately to prevent
+                    // 4+ second network timeout while dict JS tries CDN fallback
+                    if (url.scheme == "https" || url.scheme == "http") {
+                        val host = url.host ?: ""
+                        if ("cdnjs.cloudflare.com" in host || "cdn.jsdelivr.net" in host) {
+                            return WebResourceResponse(
+                                "text/javascript", "UTF-8",
+                                ByteArrayInputStream(ByteArray(0))
+                            )
+                        }
+                        return null // allow other HTTP requests
+                    }
+
                     if (url.scheme != "file") return null
 
                     val path = url.path ?: return null

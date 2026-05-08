@@ -233,7 +233,9 @@ private fun DictPage(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { webView },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(rememberNestedScrollInterop())
         )
         if (isLoading && isCurrentPage) {
             CircularProgressIndicator(
@@ -254,6 +256,40 @@ private fun loadEntryHtml(webView: WebView, entry: DictionaryEntry, dictDir: Fil
         "UTF-8",
         null
     )
+}
+
+// ─── Nested-scroll interop: bridges WebView native scroll → Compose ─────────
+
+/**
+ * Manual nested-scroll bridge between the WebView (native Android View) and
+ * Compose's nested-scroll system.
+ *
+ * The WebView handles vertical scrolling internally via Android's native touch
+ * dispatch, outside of Compose's nested-scroll protocol.  Without this bridge
+ * the system sees every vertical scroll as "unconsumed," which (on rapid
+ * successive gestures) can confuse the parent [HorizontalPager] into
+ * intercepting the next scroll — the page then appears stuck.
+ *
+ * This connection consumes the leftover vertical delta / velocity in
+ * [onPostScroll] / [onPostFling] so the parent chain knows the child already
+ * handled it.
+ */
+@Composable
+private fun rememberNestedScrollInterop(): NestedScrollConnection {
+    return remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = Offset(0f, available.y)
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity = Velocity(0f, available.y)
+        }
+    }
 }
 
 // ─── Gesture filter: only purely horizontal swipes can trigger tab switch ─────
