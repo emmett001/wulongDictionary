@@ -34,8 +34,8 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Upper breathing space → pushes logo to ~42% ──────────
-            Spacer(modifier = Modifier.weight(0.72f))
+            // ── Upper breathing space → pushes logo above midline ───
+            Spacer(modifier = Modifier.weight(0.3f))
 
             // ── Logo ─────────────────────────────────────────────────
             Image(
@@ -57,8 +57,11 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
                 textAlign = TextAlign.Center
             )
 
-            // ── Breathing space between brand and search ─────────────
-            Spacer(modifier = Modifier.weight(1.08f))
+            // ── Thin gap → search bar top edge at screen midline ─────
+            Spacer(modifier = Modifier.weight(0.02f))
+
+            // ── Extra offset ─────────────────────────────────────────
+            Spacer(modifier = Modifier.height(90.dp))
 
             // ── Cream pill search bar ────────────────────────────────
             Surface(
@@ -86,7 +89,7 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "输入单词以查询…",
+                        text = "今天搜点什么好呢？",
                         style = MaterialTheme.typography.bodyLarge,
                         color = WulongColors.Placeholder,
                         fontSize = 15.sp
@@ -95,7 +98,7 @@ fun MainScreen(onNavigateToSearch: () -> Unit) {
             }
 
             // ── Bottom breathing space ───────────────────────────────
-            Spacer(modifier = Modifier.weight(0.9f))
+            Spacer(modifier = Modifier.weight(0.65f))
         }
     }
 }

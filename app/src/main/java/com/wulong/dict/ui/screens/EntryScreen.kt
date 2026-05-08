@@ -3,11 +3,13 @@ package com.wulong.dict.ui.screens
 import android.graphics.Bitmap
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -28,6 +30,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.wulong.dict.domain.model.DictionaryEntry
 import com.wulong.dict.ui.pool.WebViewPool
 import com.wulong.dict.ui.theme.WulongColors
+import com.wulong.dict.ui.theme.WulongFonts
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -67,6 +70,9 @@ fun EntryScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.clickable(onClick = onSearchWordClick),
+                        fontFamily = WulongFonts.PlayfairDisplay,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
                         color = WulongColors.BodyText
                     )
                 },
@@ -93,9 +99,15 @@ fun EntryScreen(
                 containerColor = WulongColors.Background,
                 indicator = { tabPositions ->
                     if (pagerState.currentPage < tabPositions.size) {
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                            color = MaterialTheme.colorScheme.primary
+                        Box(
+                            modifier = Modifier
+                                .tabIndicatorOffset(tabPositions[pagerState.currentPage])
+                                .width(24.dp)
+                                .height(3.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(2.dp)
+                                )
                         )
                     }
                 },
