@@ -21,6 +21,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
@@ -59,6 +62,7 @@ fun EntryScreen(
 ) {
     val pagerState = rememberPagerState(pageCount = { 3 }, initialPage = activeDictId)
     val coroutineScope = rememberCoroutineScope()
+    var isTopAreaTouch by remember { mutableStateOf(true) }
 
     Scaffold(
         containerColor = WulongColors.Background,
@@ -140,13 +144,26 @@ fun EntryScreen(
             HorizontalDivider(thickness = 0.5.dp, color = WulongColors.SearchFill)
 
             // ── Pager: swipeable dictionary pages ──────────────────────
-            // Gesture arbitration is handled natively by NestedScrollWebView
-            // via requestDisallowInterceptTouchEvent — no Compose-level
-            // filter or userScrollEnabled gating needed.
+            // Area-restricted scroll: only top 40% of the screen allows
+            // horizontal swipes to switch tabs. Bottom 60% is reserved
+            // for vertical WebView scrolling.
             HorizontalPager(
                 state = pagerState,
                 beyondBoundsPageCount = 1,
-                modifier = Modifier.fillMaxSize()
+                userScrollEnabled = isTopAreaTouch,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                if (event.type == PointerEventType.Press) {
+                                    val y = event.changes.first().position.y
+                                    isTopAreaTouch = y < size.height * 0.4f
+                                }
+                            }
+                        }
+                    }
             ) { pageIndex ->
                 val tab = DICT_TABS[pageIndex]
                 val entry = results.firstOrNull { it.dictionaryId == tab.id }
