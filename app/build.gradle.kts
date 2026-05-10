@@ -64,10 +64,6 @@ android {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
 
-    // Keep CSS/JS uncompressed for WebView direct file access
-    androidResources {
-        noCompress += listOf("css", "js")
-    }
 }
 
 dependencies {

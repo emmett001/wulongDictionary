@@ -101,10 +101,6 @@ class WebViewPool(
                 useWideViewPort = true
                 setSupportZoom(true)
                 allowFileAccess = true
-                @Suppress("DEPRECATION")
-                allowFileAccessFromFileURLs = true
-                @Suppress("DEPRECATION")
-                allowUniversalAccessFromFileURLs = true
                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
 
