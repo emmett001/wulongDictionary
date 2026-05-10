@@ -1,7 +1,6 @@
 package com.wulong.dict
 
 import android.app.Application
-import com.wulong.dict.utils.HistoryTestHelper
 
 class WulongDictApp : Application() {
 
