@@ -137,8 +137,8 @@ fun EntryScreen(
             HorizontalDivider(thickness = 0.5.dp, color = WulongColors.SearchFill)
 
             // ── Pager: swipeable dictionary pages ──────────────────────
-            // Area-restricted scroll: only top 40% of the screen allows
-            // horizontal swipes to switch tabs. Bottom 60% is reserved
+            // Area-restricted scroll: only top 55% of the screen allows
+            // horizontal swipes to switch tabs. Bottom 45% is reserved
             // for vertical WebView scrolling.
             HorizontalPager(
                 state = pagerState,
@@ -152,7 +152,7 @@ fun EntryScreen(
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 if (event.type == PointerEventType.Press) {
                                     val y = event.changes.first().position.y
-                                    isTopAreaTouch = y < size.height * 0.4f
+                                    isTopAreaTouch = y < size.height * 0.55f
                                 }
                             }
                         }

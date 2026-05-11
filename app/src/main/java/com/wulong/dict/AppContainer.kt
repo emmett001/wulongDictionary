@@ -2,6 +2,7 @@ package com.wulong.dict
 
 import android.content.Context
 import com.wulong.dict.data.local.AppDatabase
+import com.wulong.dict.data.local.DictionaryOrderSettings
 import com.wulong.dict.data.local.LanguageSettings
 import com.wulong.dict.data.local.SqliteDictEngine
 import com.wulong.dict.data.repository.DictionaryRepositoryImpl
@@ -11,6 +12,8 @@ import com.wulong.dict.domain.repository.DictionaryRepository
 import com.wulong.dict.domain.repository.HistoryRepository
 import com.wulong.dict.domain.usecase.*
 import com.wulong.dict.ui.pool.WebViewPool
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -26,19 +29,56 @@ class AppContainer(context: Context, val languageSettings: LanguageSettings, ini
     private fun dictRootFor(lang: Language) =
         appContext.getExternalFilesDir(null)!!.resolve("dicts/${lang.code}")
 
+    // ── Dictionary order ─────────────────────────────────────────────────
+    val dictionaryOrderSettings = DictionaryOrderSettings(appContext)
+
+    private fun createEngine(lang: Language): SqliteDictEngine {
+        val engine = SqliteDictEngine(dictRootFor(lang))
+        val order = runBlocking { dictionaryOrderSettings.dictOrder.first() }
+        if (order.isNotEmpty()) engine.applyOrder(order)
+        return engine
+    }
+
     // ── Data layer ──────────────────────────────────────────────────────
 
     /** Exposed for debug/testing purposes. */
     val database: AppDatabase = AppDatabase.getInstance(appContext)
     private val historyDao = database.searchHistoryDao()
 
-    var dictEngine: SqliteDictEngine = SqliteDictEngine(dictRootFor(language))
+    var dictEngine: SqliteDictEngine = createEngine(language)
         private set
 
     fun switchLanguage(code: String) {
         dictEngine.close()
         language = Language.fromCode(code)
-        dictEngine = SqliteDictEngine(dictRootFor(language))
+        dictEngine = createEngine(language)
+        dictEngine.open()
+    }
+
+    // ── Dictionary management ────────────────────────────────────────────
+
+    fun deleteDictionary(config: SqliteDictEngine.DictConfig) {
+        dictEngine.close()
+        val dbFile = dictEngine.resolveDbFile(config)
+        dbFile.parentFile?.deleteRecursively()
+        dictEngine = createEngine(language)
+        dictEngine.open()
+        // Update order to remove the deleted dict
+        val dirName = dbFile.parentFile?.name ?: return
+        runBlocking {
+            val current = dictionaryOrderSettings.dictOrder.first()
+            dictionaryOrderSettings.setOrder(current.filter { it != dirName })
+        }
+    }
+
+    fun reorderDictionaries(order: List<String>) {
+        dictEngine.applyOrder(order)
+        runBlocking { dictionaryOrderSettings.setOrder(order) }
+    }
+
+    fun reloadEngine() {
+        dictEngine.close()
+        dictEngine = createEngine(language)
         dictEngine.open()
     }
 

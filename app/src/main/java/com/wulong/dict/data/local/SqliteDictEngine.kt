@@ -27,13 +27,45 @@ class SqliteDictEngine(private val dictRootDir: File) {
     )
 
     /** Dynamically discovered dictionary configurations. */
-    val configs: List<DictConfig> = scanDictionaries()
+    var configs: List<DictConfig> = scanDictionaries()
+        private set
+
+    /** Reorder configs to match the saved preference. Unknown entries are appended at the end.
+     * Must be called after [open] — re-keys the internal database map to match new IDs. */
+    fun applyOrder(order: List<String>) {
+        // Map old DBs by directory name for stable re-keying
+        val dbByDir = databases.entries.associate { (oldId, db) ->
+            val dirName = configs.firstOrNull { it.id == oldId }
+                ?.let { resolveDbFile(it).parentFile?.name } ?: ""
+            dirName to db
+        }
+
+        val byName = configs.associateBy { resolveDbFile(it).parentFile?.name ?: "" }
+        val ordered = mutableListOf<DictConfig>()
+        for (dirName in order) {
+            byName[dirName]?.let { ordered.add(it) }
+        }
+        for (config in configs) {
+            val dirName = resolveDbFile(config).parentFile?.name ?: ""
+            if (dirName !in order) ordered.add(config)
+        }
+
+        configs = ordered.mapIndexed { index, config ->
+            config.copy(id = index)
+        }
+
+        databases.clear()
+        for (config in configs) {
+            val dirName = resolveDbFile(config).parentFile?.name ?: ""
+            dbByDir[dirName]?.let { databases[config.id] = it }
+        }
+    }
 
     companion object {
         private const val TAG = "SqliteDictEngine"
     }
 
-    private fun resolveDbFile(config: DictConfig): File = File(dictRootDir, config.dbRelPath)
+    fun resolveDbFile(config: DictConfig): File = File(dictRootDir, config.dbRelPath)
 
     private val databases = mutableMapOf<Int, SQLiteDatabase>()
 
@@ -95,7 +127,18 @@ class SqliteDictEngine(private val dictRootDir: File) {
     }
 
     /** Look up a word in a specific dictionary. Returns HTML content or null. */
-    fun search(keyword: String, dictId: Int): String? {
+    fun search(keyword: String, dictId: Int): String? = searchWithRedirect(keyword, dictId, maxDepth = 3)
+
+    /**
+     * Internal search that follows @@@LINK= redirect chains.
+     *
+     * MDX datasets use soft-redirect entries whose content is the literal string
+     * `@@@LINK=<target>` (possibly with trailing whitespace/newlines).  When
+     * such an entry is returned we extract the target word and recursively look
+     * it up in the same dictionary, up to [maxDepth] times, to prevent infinite
+     * loops on circular A → B → A chains.
+     */
+    private fun searchWithRedirect(keyword: String, dictId: Int, maxDepth: Int): String? {
         val db = databases[dictId] ?: return null
         val lower = keyword.lowercase()
 
@@ -110,13 +153,31 @@ class SqliteDictEngine(private val dictRootDir: File) {
         if (originalKey == null) return null
 
         // Step 2: fetch HTML content from entries table
-        db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf(originalKey)).use { cursor ->
+        val raw: String = db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf(originalKey)).use { cursor ->
             if (cursor.moveToFirst()) {
-                val blob = cursor.getBlob(0)
-                return String(blob, Charsets.UTF_8)
+                String(cursor.getBlob(0), Charsets.UTF_8)
+            } else {
+                return null
             }
         }
-        return null
+
+        // Step 3: handle @@@LINK= redirects
+        val trimmed = raw.trimStart()
+        if (trimmed.startsWith("@@@LINK=")) {
+            val target = trimmed.removePrefix("@@@LINK=").trim().lines().firstOrNull()?.trim() ?: return null
+            if (maxDepth <= 1) {
+                Log.w(TAG, "Redirect depth exceeded: $keyword → $target (dict=$dictId)")
+                return "<html><body><p style='color:#999;padding:16px'>跳转次数过多</p></body></html>"
+            }
+            if (target.equals(keyword, ignoreCase = true)) {
+                Log.w(TAG, "Self-redirect loop: $keyword (dict=$dictId)")
+                return "<html><body><p style='color:#999;padding:16px'>词条循环引用</p></body></html>"
+            }
+            Log.d(TAG, "Redirect: $keyword → $target (dict=$dictId, depth=${4 - maxDepth})")
+            return searchWithRedirect(target, dictId, maxDepth - 1)
+        }
+
+        return raw
     }
 
     /** Prefix-based autocomplete across all dictionaries. */

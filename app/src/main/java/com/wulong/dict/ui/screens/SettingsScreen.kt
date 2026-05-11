@@ -1,5 +1,6 @@
 package com.wulong.dict.ui.screens
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -7,6 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,10 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import com.wulong.dict.AppContainer
+import com.wulong.dict.data.local.SqliteDictEngine
 import com.wulong.dict.domain.model.Language
 import com.wulong.dict.ui.theme.WulongColors
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +49,13 @@ fun SettingsScreen(
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var dictRefreshKey by remember { mutableStateOf(0) }
+    var deleteTarget by remember { mutableStateOf<SqliteDictEngine.DictConfig?>(null) }
+
+    // Force recompose when engine configs change
+    val dictConfigs = remember(dictRefreshKey, appContainer.dictEngine.configs.size) {
+        appContainer.dictEngine.configs
+    }
 
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -126,6 +139,38 @@ fun SettingsScreen(
         )
     }
 
+    // ── Delete confirmation dialog ──────────────────────────────────
+    val configToDelete = deleteTarget
+    if (configToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("删除词典") },
+            text = {
+                Text("确定要删除「${configToDelete.fullName}」吗？\n\n这将永久删除词典数据，无法恢复。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val config = configToDelete
+                    deleteTarget = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            appContainer.deleteDictionary(config)
+                        }
+                        dictRefreshKey++
+                        Toast.makeText(context, "已删除「${config.shortName}」", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = WulongColors.Background,
         topBar = {
@@ -152,20 +197,118 @@ fun SettingsScreen(
                 .padding(padding)
                 .padding(24.dp)
         ) {
-            // ── Dictionary status ──────────────────────────────────
+            // ── Dictionary management ───────────────────────────────
             Text(
-                text = "词典数据",
+                text = "词典管理",
                 style = MaterialTheme.typography.titleSmall,
                 color = WulongColors.BodyText
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = "牛津 / 柯林斯 / 韦氏大学",
-                style = MaterialTheme.typography.bodyMedium,
-                color = WulongColors.Placeholder
-            )
+            if (dictConfigs.isEmpty()) {
+                Text(
+                    text = "暂无词典，请先导入",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = WulongColors.Placeholder
+                )
+            } else {
+                dictConfigs.forEachIndexed { index, config ->
+                    val dirName = appContainer.dictEngine.resolveDbFile(config).parentFile?.name ?: config.shortName
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = WulongColors.SearchFill
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Reorder buttons
+                            Column {
+                                IconButton(
+                                    onClick = {
+                                        if (index > 0) {
+                                            val reordered = dictConfigs.map {
+                                                appContainer.dictEngine.resolveDbFile(it).parentFile?.name ?: ""
+                                            }.toMutableList()
+                                            val moved = reordered.removeAt(index)
+                                            reordered.add(index - 1, moved)
+                                            appContainer.reorderDictionaries(reordered)
+                                            dictRefreshKey++
+                                        }
+                                    },
+                                    enabled = index > 0,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ArrowUpward,
+                                        contentDescription = "上移",
+                                        tint = if (index > 0) WulongColors.BodyText else WulongColors.Placeholder,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        if (index < dictConfigs.size - 1) {
+                                            val reordered = dictConfigs.map {
+                                                appContainer.dictEngine.resolveDbFile(it).parentFile?.name ?: ""
+                                            }.toMutableList()
+                                            val moved = reordered.removeAt(index)
+                                            reordered.add(index + 1, moved)
+                                            appContainer.reorderDictionaries(reordered)
+                                            dictRefreshKey++
+                                        }
+                                    },
+                                    enabled = index < dictConfigs.size - 1,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ArrowDownward,
+                                        contentDescription = "下移",
+                                        tint = if (index < dictConfigs.size - 1) WulongColors.BodyText else WulongColors.Placeholder,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Dict info
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = config.shortName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    color = WulongColors.BodyText
+                                )
+                                Text(
+                                    text = config.fullName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = WulongColors.Placeholder,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            // Delete button
+                            IconButton(
+                                onClick = { deleteTarget = config }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "删除词典",
+                                    tint = WulongColors.Placeholder,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -294,8 +437,20 @@ private fun importFromFolder(
     // Reinitialize engine only if we imported to the current language
     if (langCode == appContainer.language.code) {
         try {
-            appContainer.dictEngine.close()
-            appContainer.dictEngine.open()
+            appContainer.reloadEngine()
+            // Append newly imported directories to the saved order
+            val existing = kotlinx.coroutines.runBlocking {
+                appContainer.dictionaryOrderSettings.dictOrder.first()
+            }
+            val newDirs = srcRoot.listFiles()
+                .filter { it.isDirectory }
+                .map { it.name ?: "" }
+                .filter { it.isNotEmpty() && it !in existing }
+            if (newDirs.isNotEmpty()) {
+                kotlinx.coroutines.runBlocking {
+                    appContainer.dictionaryOrderSettings.setOrder(existing + newDirs)
+                }
+            }
         } catch (e: Exception) {
             errors.add("重新加载引擎失败: ${e.message}")
         }
