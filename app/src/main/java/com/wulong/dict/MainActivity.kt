@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
@@ -95,12 +96,20 @@ class MainActivity : ComponentActivity() {
                     }
                     composable(NavRoutes.ENTRY) {
                         val state by viewModel.uiState.collectAsState()
+                        // Consume internal-link navigation flag so it doesn't
+                        // bounce when the user presses back to SEARCH.
+                        LaunchedEffect(state.shouldNavigateToEntry) {
+                            if (state.shouldNavigateToEntry) viewModel.onNavigatedToEntry()
+                        }
                         EntryScreen(
                             word = state.query,
                             results = state.results,
                             activeDictId = state.activeDictId,
                             onNavigateBack = { navController.popBackStack() },
                             onSearchWordClick = { navController.popBackStack() },
+                            onWordClick = { word, dictId ->
+                                viewModel.onSearch(word, dictId)
+                            },
                             webViewPool = container.webViewPool,
                             dictDirs = container.dictDirs,
                             dictConfigs = container.dictEngine.configs

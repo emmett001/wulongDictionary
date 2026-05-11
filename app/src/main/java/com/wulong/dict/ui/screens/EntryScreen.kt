@@ -1,6 +1,9 @@
 package com.wulong.dict.ui.screens
 
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
+import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -46,6 +49,7 @@ fun EntryScreen(
     activeDictId: Int,
     onNavigateBack: () -> Unit,
     onSearchWordClick: () -> Unit,
+    onWordClick: (String, Int) -> Unit,
     webViewPool: WebViewPool,
     dictDirs: Map<Int, File>,
     dictConfigs: List<SqliteDictEngine.DictConfig>,
@@ -168,6 +172,7 @@ fun EntryScreen(
                     dictDir = dictDir,
                     webViewPool = webViewPool,
                     isCurrentPage = pagerState.currentPage == pageIndex,
+                    onInternalLinkClick = { target -> onWordClick(target, config.id) },
                 )
             }
         }
@@ -183,6 +188,7 @@ private fun DictPage(
     dictDir: File?,
     webViewPool: WebViewPool,
     isCurrentPage: Boolean,
+    onInternalLinkClick: (String) -> Unit = {},
 ) {
     if (entry == null) {
         Box(
@@ -200,7 +206,7 @@ private fun DictPage(
 
     val webView = remember { webViewPool.acquire() }
     var isLoading by remember { mutableStateOf(true) }
-    var hasLoaded by remember { mutableStateOf(false) }
+    var hasLoaded by remember(entry.keyword) { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -229,6 +235,44 @@ private fun DictPage(
             ): android.webkit.WebResourceResponse? {
                 return originalClient.shouldInterceptRequest(view, request)
             }
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?
+            ): Boolean {
+                val url = request?.url ?: return super.shouldOverrideUrlLoading(view, request)
+                val scheme = url.scheme ?: return super.shouldOverrideUrlLoading(view, request)
+
+                // Private MDX link schemes — extract target word and trigger search
+                if (scheme == "entry" || scheme == "bword") {
+                    val target = Uri.decode(url.schemeSpecificPart.trimStart('/'))
+                    if (target.isNotBlank()) {
+                        Log.d("EntryScreen", "Internal link: $scheme → $target (dict=$dictId)")
+                        onInternalLinkClick(target)
+                        return true
+                    }
+                }
+
+                // Plain-text relative link like href="word" — treat as internal lookup
+                if (url.scheme == null && url.host == null && url.path != null) {
+                    val target = Uri.decode(url.path!!).trim()
+                    if (target.isNotBlank() && !target.startsWith("/")) {
+                        Log.d("EntryScreen", "Plain link: $target (dict=$dictId)")
+                        onInternalLinkClick(target)
+                        return true
+                    }
+                }
+
+                // External HTTP links → open in browser
+                if (scheme == "http" || scheme == "https") {
+                    try {
+                        view?.context?.startActivity(Intent(Intent.ACTION_VIEW, url))
+                    } catch (_: Exception) { }
+                    return true
+                }
+
+                return super.shouldOverrideUrlLoading(view, request)
+            }
         }
         onDispose {
             // Restore original client so pool gets back a clean WebView
@@ -236,8 +280,10 @@ private fun DictPage(
         }
     }
 
-    // Load HTML when this tab becomes visible (or pre-load adjacent tabs).
-    LaunchedEffect(isCurrentPage) {
+    // Load HTML when this tab becomes visible, or when the entry changes
+    // (e.g. internal cross-reference link clicked from within the WebView).
+    val loadKey = entry?.keyword
+    LaunchedEffect(isCurrentPage, loadKey) {
         if (!hasLoaded) {
             if (isCurrentPage) {
                 loadEntryHtml(webView, entry, dictDir)

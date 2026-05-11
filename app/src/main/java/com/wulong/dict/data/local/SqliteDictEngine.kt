@@ -150,16 +150,25 @@ class SqliteDictEngine(private val dictRootDir: File) {
             }
         }
 
-        if (originalKey == null) return null
-
-        // Step 2: fetch HTML content from entries table
-        val raw: String = db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf(originalKey)).use { cursor ->
+        // Step 2: fetch HTML content from entries table.
+        // When the keyword isn't in the search table (e.g. an MDX internal entry ID
+        // like "daijirin2-148966-0001" used as an href target), fall back to
+        // querying the entries table directly. Some dictionaries prefix entry keys
+        // with "@" (e.g. "@daijirin2-148966-0001") — try both.
+        val lookupKey = originalKey ?: keyword
+        val raw = db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf(lookupKey)).use { cursor ->
             if (cursor.moveToFirst()) {
                 String(cursor.getBlob(0), Charsets.UTF_8)
+            } else if (originalKey == null) {
+                // Fallback: try with "@" prefix (MDX internal key convention)
+                db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf("@$keyword")).use { inner ->
+                    if (inner.moveToFirst()) String(inner.getBlob(0), Charsets.UTF_8) else null
+                }
             } else {
-                return null
+                null
             }
         }
+        if (raw == null) return null
 
         // Step 3: handle @@@LINK= redirects
         val trimmed = raw.trimStart()

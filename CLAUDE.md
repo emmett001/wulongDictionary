@@ -75,3 +75,17 @@ app/src/main/java/com/wulong/dict/
 
 ### Error message opacity
 `SearchViewModel` init block catches `Exception` and shows `e.message ?: "初始化失败"`. Many exceptions have null messages (NPE, some IOExceptions). Always add `Log.e` with full stacktrace alongside the UI error, and include exception class name in the display string.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses the default five-label vocabulary (needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
