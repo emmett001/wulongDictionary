@@ -2,6 +2,7 @@ package com.wulong.dict.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,13 +13,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import com.wulong.dict.AppContainer
+import com.wulong.dict.domain.model.Language
 import com.wulong.dict.ui.theme.WulongColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -27,18 +32,23 @@ import java.io.File
 fun SettingsScreen(
     appContainer: AppContainer,
     onNavigateBack: () -> Unit,
+    onLanguageChanged: (String) -> Unit = {},
 ) {
+    val currentLang = remember {
+        runBlocking { appContainer.languageSettings.languageCode.first() }
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var statusText by remember { mutableStateOf("") }
     var showConfirmDialog by remember { mutableStateOf(false) }
-    var hasPendingFolder by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showLangDialog by remember { mutableStateOf(false) }
+    var pendingUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            hasPendingFolder = uri
+            pendingUri = uri
             showConfirmDialog = true
         }
     }
@@ -48,7 +58,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = {
                 showConfirmDialog = false
-                hasPendingFolder = null
+                pendingUri = null
             },
             title = { Text("导入词典文件？") },
             text = {
@@ -57,23 +67,58 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showConfirmDialog = false
-                    val uri = hasPendingFolder ?: return@TextButton
-                    hasPendingFolder = null
-                    scope.launch {
-                        statusText = "正在导入..."
-                        val result = withContext(Dispatchers.IO) {
-                            importFromFolder(context, uri, appContainer)
-                        }
-                        statusText = result
-                    }
+                    showLangDialog = true
                 }) {
-                    Text("导入")
+                    Text("继续")
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showConfirmDialog = false
-                    hasPendingFolder = null
+                    pendingUri = null
+                }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    // ── Language selection dialog ────────────────────────────────────
+    if (showLangDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showLangDialog = false
+                pendingUri = null
+            },
+            title = { Text("选择词典语言") },
+            text = {
+                Text("这些词典将导入到哪种语言的数据目录下？")
+            },
+            confirmButton = {
+                Row {
+                    Language.entries.forEach { lang ->
+                        TextButton(onClick = {
+                            showLangDialog = false
+                            val uri = pendingUri ?: return@TextButton
+                            pendingUri = null
+                            scope.launch {
+                                statusText = "正在导入..."
+                                val result = withContext(Dispatchers.IO) {
+                                    importFromFolder(context, uri, lang.code, appContainer)
+                                }
+                                statusText = result
+                            }
+                        }) {
+                            Text(lang.displayName)
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showLangDialog = false
+                    pendingUri = null
                 }) {
                     Text("取消")
                 }
@@ -124,6 +169,57 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Language selection ──────────────────────────────────
+            Text(
+                text = "界面语言",
+                style = MaterialTheme.typography.titleSmall,
+                color = WulongColors.BodyText
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Language.entries.forEach { lang ->
+                val selected = currentLang == lang.code
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (!selected) {
+                                scope.launch {
+                                    appContainer.languageSettings.setLanguage(lang.code)
+                                    onLanguageChanged(lang.code)
+                                }
+                            }
+                        }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selected,
+                        onClick = {
+                            if (!selected) {
+                                scope.launch {
+                                    appContainer.languageSettings.setLanguage(lang.code)
+                                    onLanguageChanged(lang.code)
+                                }
+                            }
+                        },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = lang.displayName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) WulongColors.BodyText else WulongColors.Placeholder
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // ── Import button ──────────────────────────────────────
             Button(
                 onClick = { folderPicker.launch(null) },
@@ -167,12 +263,13 @@ fun SettingsScreen(
 private fun importFromFolder(
     context: android.content.Context,
     folderUri: android.net.Uri,
+    langCode: String,
     appContainer: AppContainer
 ): String {
     val srcRoot = DocumentFile.fromTreeUri(context, folderUri)
         ?: return "无法读取所选文件夹"
 
-    val targetRoot = File(context.getExternalFilesDir(null), "Dictionary")
+    val targetRoot = File(context.getExternalFilesDir(null), "dicts/$langCode")
 
     // Take persistent permission so we can read the folder
     context.contentResolver.takePersistableUriPermission(
@@ -194,12 +291,14 @@ private fun importFromFolder(
         }
     }
 
-    // Reinitialize the dictionary engine with the new files
-    try {
-        appContainer.dictEngine.close()
-        appContainer.dictEngine.open()
-    } catch (e: Exception) {
-        errors.add("重新加载引擎失败: ${e.message}")
+    // Reinitialize engine only if we imported to the current language
+    if (langCode == appContainer.language.code) {
+        try {
+            appContainer.dictEngine.close()
+            appContainer.dictEngine.open()
+        } catch (e: Exception) {
+            errors.add("重新加载引擎失败: ${e.message}")
+        }
     }
 
     if (errors.isNotEmpty()) {

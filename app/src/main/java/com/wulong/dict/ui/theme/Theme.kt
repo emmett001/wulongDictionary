@@ -18,6 +18,9 @@ object WulongFonts {
         Font(R.font.playfair_display_regular, FontWeight.Normal),
         Font(R.font.playfair_display_regular, FontWeight.Bold),
     )
+    val NotoSerifJP = FontFamily(
+        Font(R.font.noto_serif_jp_extralight, FontWeight.ExtraLight)
+    )
 }
 
 // ── Brand palette ─────────────────────────────────────────────────────────

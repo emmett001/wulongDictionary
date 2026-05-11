@@ -30,24 +30,13 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.wulong.dict.data.local.SqliteDictEngine
 import com.wulong.dict.domain.model.DictionaryEntry
 import com.wulong.dict.ui.pool.WebViewPool
 import com.wulong.dict.ui.theme.WulongColors
 import com.wulong.dict.ui.theme.WulongFonts
 import kotlinx.coroutines.launch
 import java.io.File
-
-private data class DictTab(
-    val id: Int,
-    val shortName: String,
-    val fullName: String,
-)
-
-private val DICT_TABS = listOf(
-    DictTab(0, "牛津", "牛津高阶双解词典"),
-    DictTab(1, "柯林斯", "柯林斯高阶双解词典"),
-    DictTab(2, "韦氏大学", "韦氏大学词典"),
-)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -59,8 +48,12 @@ fun EntryScreen(
     onSearchWordClick: () -> Unit,
     webViewPool: WebViewPool,
     dictDirs: Map<Int, File>,
+    dictConfigs: List<SqliteDictEngine.DictConfig>,
 ) {
-    val pagerState = rememberPagerState(pageCount = { 3 }, initialPage = activeDictId)
+    val pagerState = rememberPagerState(
+        pageCount = { dictConfigs.size },
+        initialPage = activeDictId.coerceIn(0, maxOf(dictConfigs.size - 1, 0))
+    )
     val coroutineScope = rememberCoroutineScope()
     var isTopAreaTouch by remember { mutableStateOf(true) }
 
@@ -117,7 +110,7 @@ fun EntryScreen(
                 },
                 divider = {}
             ) {
-                DICT_TABS.forEachIndexed { index, tab ->
+                dictConfigs.forEachIndexed { index, config ->
                     val selected = pagerState.currentPage == index
                     Tab(
                         selected = selected,
@@ -128,7 +121,7 @@ fun EntryScreen(
                         },
                         text = {
                             Text(
-                                text = tab.shortName,
+                                text = config.shortName,
                                 fontSize = 17.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (selected) WulongColors.BodyText
@@ -165,13 +158,13 @@ fun EntryScreen(
                         }
                     }
             ) { pageIndex ->
-                val tab = DICT_TABS[pageIndex]
-                val entry = results.firstOrNull { it.dictionaryId == tab.id }
-                val dictDir = dictDirs[tab.id]
+                val config = dictConfigs[pageIndex]
+                val entry = results.firstOrNull { it.dictionaryId == config.id }
+                val dictDir = dictDirs[config.id]
 
                 DictPage(
                     entry = entry,
-                    dictId = tab.id,
+                    dictId = config.id,
                     dictDir = dictDir,
                     webViewPool = webViewPool,
                     isCurrentPage = pagerState.currentPage == pageIndex,

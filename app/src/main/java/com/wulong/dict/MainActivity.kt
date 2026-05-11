@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable(NavRoutes.MAIN) {
                         MainScreen(
+                            language = container.language,
                             onNavigateToSearch = {
                                 viewModel.onEnterSearch()
                                 navController.navigate(NavRoutes.SEARCH)
@@ -70,7 +71,11 @@ class MainActivity : ComponentActivity() {
                     composable(NavRoutes.SETTINGS) {
                         SettingsScreen(
                             appContainer = container,
-                            onNavigateBack = { navController.popBackStack() }
+                            onNavigateBack = { navController.popBackStack() },
+                            onLanguageChanged = { newCode ->
+                                container.switchLanguage(newCode)
+                                recreate()
+                            }
                         )
                     }
                     composable(NavRoutes.SEARCH) {
@@ -97,7 +102,8 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() },
                             onSearchWordClick = { navController.popBackStack() },
                             webViewPool = container.webViewPool,
-                            dictDirs = container.dictDirs
+                            dictDirs = container.dictDirs,
+                            dictConfigs = container.dictEngine.configs
                         )
                     }
                 }

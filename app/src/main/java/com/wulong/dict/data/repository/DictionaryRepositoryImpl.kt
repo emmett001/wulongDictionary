@@ -25,7 +25,7 @@ class DictionaryRepositoryImpl(
 
     override suspend fun searchWord(word: String): List<DictionaryEntry> =
         withContext(ioDispatcher) {
-            SqliteDictEngine.DICTIONARIES.map { config ->
+            dictEngine.configs.map { config ->
                 async {
                     try {
                         val html = dictEngine.search(word, config.id)
@@ -34,7 +34,7 @@ class DictionaryRepositoryImpl(
                                 keyword = word,
                                 htmlContent = html,
                                 dictionaryId = config.id,
-                                dictionaryLabel = config.label
+                                dictionaryLabel = config.fullName
                             )
                         } else null
                     } catch (e: Exception) {

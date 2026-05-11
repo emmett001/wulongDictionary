@@ -12,8 +12,8 @@ android {
         applicationId = "com.wulong.dict"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -96,6 +96,9 @@ dependencies {
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // DataStore Preferences (language persistence)
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // DocumentFile (SAF folder access for dictionary import)
     implementation("androidx.documentfile:documentfile:1.0.1")

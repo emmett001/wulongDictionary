@@ -14,16 +14,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wulong.dict.R
+import com.wulong.dict.domain.model.Language
 import com.wulong.dict.ui.theme.WulongColors
 import com.wulong.dict.ui.theme.WulongFonts
 
 @Composable
-fun MainScreen(onNavigateToSearch: () -> Unit, onNavigateToSettings: () -> Unit) {
+fun MainScreen(
+    language: Language,
+    onNavigateToSearch: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
+    val (slogan, placeholder) = when (language) {
+        Language.EN -> "Words build worlds." to "今天搜点什么好呢？"
+        Language.JA -> "辞書は、もっと軽くていい。" to "何を調べますか？"
+    }
+
+    val sloganFont = when (language) {
+        Language.EN -> WulongFonts.PlayfairDisplay
+        Language.JA -> WulongFonts.NotoSerifJP
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -64,8 +79,8 @@ fun MainScreen(onNavigateToSearch: () -> Unit, onNavigateToSettings: () -> Unit)
 
             // ── Slogan — literary, restrained ────────────────────────
             Text(
-                text = "Words build worlds.",
-                fontFamily = WulongFonts.PlayfairDisplay,
+                text = slogan,
+                fontFamily = sloganFont,
                 fontWeight = FontWeight.Normal,
                 fontSize = 18.sp,
                 color = WulongColors.Placeholder,
@@ -105,7 +120,7 @@ fun MainScreen(onNavigateToSearch: () -> Unit, onNavigateToSettings: () -> Unit)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "今天搜点什么好呢？",
+                        text = placeholder,
                         style = MaterialTheme.typography.bodyLarge,
                         color = WulongColors.Placeholder,
                         fontSize = 15.sp

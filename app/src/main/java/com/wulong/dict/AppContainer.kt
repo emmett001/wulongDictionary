@@ -2,9 +2,11 @@ package com.wulong.dict
 
 import android.content.Context
 import com.wulong.dict.data.local.AppDatabase
+import com.wulong.dict.data.local.LanguageSettings
 import com.wulong.dict.data.local.SqliteDictEngine
 import com.wulong.dict.data.repository.DictionaryRepositoryImpl
 import com.wulong.dict.data.repository.HistoryRepositoryImpl
+import com.wulong.dict.domain.model.Language
 import com.wulong.dict.domain.repository.DictionaryRepository
 import com.wulong.dict.domain.repository.HistoryRepository
 import com.wulong.dict.domain.usecase.*
@@ -14,10 +16,15 @@ import java.io.File
 /**
  * Simple manual DI container — avoids heavyweight DI frameworks for this single-purpose app.
  */
-class AppContainer(context: Context) {
+class AppContainer(context: Context, val languageSettings: LanguageSettings, initialLanguageCode: String) {
 
     private val appContext = context.applicationContext
-    private val dictRootDir = appContext.getExternalFilesDir(null)!!.resolve("Dictionary")
+
+    var language: Language = Language.fromCode(initialLanguageCode)
+        private set
+
+    private fun dictRootFor(lang: Language) =
+        appContext.getExternalFilesDir(null)!!.resolve("dicts/${lang.code}")
 
     // ── Data layer ──────────────────────────────────────────────────────
 
@@ -25,7 +32,15 @@ class AppContainer(context: Context) {
     val database: AppDatabase = AppDatabase.getInstance(appContext)
     private val historyDao = database.searchHistoryDao()
 
-    val dictEngine: SqliteDictEngine = SqliteDictEngine(dictRootDir)
+    var dictEngine: SqliteDictEngine = SqliteDictEngine(dictRootFor(language))
+        private set
+
+    fun switchLanguage(code: String) {
+        dictEngine.close()
+        language = Language.fromCode(code)
+        dictEngine = SqliteDictEngine(dictRootFor(language))
+        dictEngine.open()
+    }
 
     // ── WebView pool ──────────────────────────────────────────────────────
 
@@ -33,7 +48,7 @@ class AppContainer(context: Context) {
 
     /** Dict ID → local directory containing CSS/JS/PNG resources. */
     val dictDirs: Map<Int, File>
-        get() = SqliteDictEngine.DICTIONARIES.mapNotNull { config ->
+        get() = dictEngine.configs.mapNotNull { config ->
             dictEngine.getResourceDir(config.id)?.let { config.id to it }
         }.toMap()
 
