@@ -39,6 +39,7 @@ fun SettingsScreen(
     appContainer: AppContainer,
     onNavigateBack: () -> Unit,
     onLanguageChanged: (String) -> Unit = {},
+    onRestartRequested: () -> Unit = {},
 ) {
     val currentLang = remember {
         runBlocking { appContainer.languageSettings.languageCode.first() }
@@ -46,6 +47,10 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var statusText by remember { mutableStateOf("") }
+    var isImporting by remember { mutableStateOf(false) }
+    var showRestartDialog by remember { mutableStateOf(false) }
+    var importProgress by remember { mutableStateOf(0f) }
+    var importDetail by remember { mutableStateOf("") }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -115,11 +120,23 @@ fun SettingsScreen(
                             val uri = pendingUri ?: return@TextButton
                             pendingUri = null
                             scope.launch {
-                                statusText = "正在导入..."
+                                statusText = ""
+                                isImporting = true
+                                importProgress = 0f
+                                importDetail = "正在扫描文件…"
                                 val result = withContext(Dispatchers.IO) {
-                                    importFromFolder(context, uri, lang.code, appContainer)
+                                    importFromFolder(context, uri, lang.code, appContainer) { done, total ->
+                                        launch(Dispatchers.Main) {
+                                            importProgress = done.toFloat() / total
+                                            importDetail = "正在复制 $done / $total"
+                                        }
+                                    }
                                 }
+                                isImporting = false
                                 statusText = result
+                                if (result.startsWith("导入完成")) {
+                                    showRestartDialog = true
+                                }
                             }
                         }) {
                             Text(lang.displayName)
@@ -134,6 +151,28 @@ fun SettingsScreen(
                     pendingUri = null
                 }) {
                     Text("取消")
+                }
+            }
+        )
+    }
+
+    // ── Restart prompt dialog ──────────────────────────────────────
+    if (showRestartDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestartDialog = false },
+            title = { Text("导入完成") },
+            text = { Text("词典已导入成功。需要重启应用以使新词典生效。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRestartDialog = false
+                    onRestartRequested()
+                }) {
+                    Text("立即重启")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestartDialog = false }) {
+                    Text("稍后")
                 }
             }
         )
@@ -391,7 +430,39 @@ fun SettingsScreen(
             )
 
             // ── Status ─────────────────────────────────────────────
-            if (statusText.isNotEmpty()) {
+            if (isImporting) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "正在导入，请勿离开此页面…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = WulongColors.Placeholder
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = { importProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = WulongColors.SearchFill,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = importDetail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WulongColors.Placeholder
+                    )
+                }
+            } else if (statusText.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = statusText,
@@ -407,27 +478,35 @@ private fun importFromFolder(
     context: android.content.Context,
     folderUri: android.net.Uri,
     langCode: String,
-    appContainer: AppContainer
+    appContainer: AppContainer,
+    onProgress: (Int, Int) -> Unit = { _, _ -> }
 ): String {
     val srcRoot = DocumentFile.fromTreeUri(context, folderUri)
         ?: return "无法读取所选文件夹"
 
     val targetRoot = File(context.getExternalFilesDir(null), "dicts/$langCode")
 
-    // Take persistent permission so we can read the folder
     context.contentResolver.takePersistableUriPermission(
         folderUri,
         android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
     )
 
+    // Count total files first so we can report progress
+    var totalFiles = 0
+    srcRoot.listFiles().forEach { child ->
+        if (child.isDirectory) totalFiles += countFiles(child)
+    }
+    if (totalFiles == 0) return "未找到任何文件，请确认已选择正确的解压目录。"
+
     var copied = 0
     val errors = mutableListOf<String>()
 
-    // Walk the selected folder looking for .sqlite3 files
     srcRoot.listFiles().forEach { child ->
         if (child.isDirectory) {
             try {
-                copied += copyDir(context, child, targetRoot)
+                copied += copyDir(context, child, targetRoot) { n ->
+                    onProgress(copied + n, totalFiles)
+                }
             } catch (e: Exception) {
                 errors.add("${child.name}: ${e.message}")
             }
@@ -462,13 +541,12 @@ private fun importFromFolder(
     return if (copied > 0) "导入完成: $copied 个文件" else "未找到任何文件，请确认已选择正确的解压目录。"
 }
 
-/** Recursively copy ALL files from a SAF directory into [targetRoot].
- * SQLite databases, CSS, JS, images, and fonts are all required for
- * WebView rendering — filtering by extension breaks layout. */
+/** Recursively copy ALL files from a SAF directory into [targetRoot]. */
 private fun copyDir(
     context: android.content.Context,
     src: DocumentFile,
-    targetRoot: File
+    targetRoot: File,
+    onFileCopied: (Int) -> Unit = {}
 ): Int {
     var count = 0
     val subDir = File(targetRoot, src.name ?: return 0)
@@ -476,7 +554,7 @@ private fun copyDir(
 
     src.listFiles().forEach { child ->
         if (child.isDirectory) {
-            count += copyDir(context, child, targetRoot)
+            count += copyDir(context, child, targetRoot) { n -> onFileCopied(count + n) }
         } else {
             val destFile = File(subDir, child.name ?: return@forEach)
             context.contentResolver.openInputStream(child.uri)?.use { input ->
@@ -485,7 +563,18 @@ private fun copyDir(
                 }
             }
             count++
+            onFileCopied(count)
         }
+    }
+    return count
+}
+
+/** Recursively count all files in a SAF directory (for progress tracking). */
+private fun countFiles(dir: DocumentFile): Int {
+    var count = 0
+    dir.listFiles().forEach { child ->
+        if (child.isDirectory) count += countFiles(child)
+        else count++
     }
     return count
 }

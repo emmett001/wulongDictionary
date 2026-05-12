@@ -76,7 +76,8 @@ class MainActivity : ComponentActivity() {
                             onLanguageChanged = { newCode ->
                                 container.switchLanguage(newCode)
                                 recreate()
-                            }
+                            },
+                            onRestartRequested = { recreate() }
                         )
                     }
                     composable(NavRoutes.SEARCH) {
