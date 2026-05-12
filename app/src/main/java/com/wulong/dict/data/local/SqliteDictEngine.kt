@@ -133,60 +133,65 @@ class SqliteDictEngine(private val dictRootDir: File) {
      * Internal search that follows @@@LINK= redirect chains.
      *
      * MDX datasets use soft-redirect entries whose content is the literal string
-     * `@@@LINK=<target>` (possibly with trailing whitespace/newlines).  When
-     * such an entry is returned we extract the target word and recursively look
-     * it up in the same dictionary, up to [maxDepth] times, to prevent infinite
-     * loops on circular A → B → A chains.
+     * `@@@LINK=<target>`. This method collects ALL matching entries for the
+     * keyword (words like 白土 may have multiple redirect entries pointing to
+     * different definitions) and concatenates resolved HTMLs with a separator.
      */
     private fun searchWithRedirect(keyword: String, dictId: Int, maxDepth: Int): String? {
         val db = databases[dictId] ?: return null
         val lower = keyword.lowercase()
 
-        // Step 1: find original_key from search table
-        var originalKey: String? = null
+        // Step 1: collect ALL distinct original_keys from search table
+        val originalKeys = mutableListOf<String>()
         db.rawQuery("SELECT original_key FROM search WHERE lower_key = ?", arrayOf(lower)).use { cursor ->
-            if (cursor.moveToFirst()) {
-                originalKey = cursor.getString(0)
+            while (cursor.moveToNext()) {
+                originalKeys.add(cursor.getString(0))
             }
         }
 
-        // Step 2: fetch HTML content from entries table.
-        // When the keyword isn't in the search table (e.g. an MDX internal entry ID
-        // like "daijirin2-148966-0001" used as an href target), fall back to
-        // querying the entries table directly. Some dictionaries prefix entry keys
-        // with "@" (e.g. "@daijirin2-148966-0001") — try both.
-        val lookupKey = originalKey ?: keyword
-        val raw = db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf(lookupKey)).use { cursor ->
-            if (cursor.moveToFirst()) {
-                String(cursor.getBlob(0), Charsets.UTF_8)
-            } else if (originalKey == null) {
-                // Fallback: try with "@" prefix (MDX internal key convention)
-                db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf("@$keyword")).use { inner ->
-                    if (inner.moveToFirst()) String(inner.getBlob(0), Charsets.UTF_8) else null
+        // Step 2: for each original_key, fetch ALL content rows from entries
+        val lookupKeys = if (originalKeys.isEmpty()) listOf(keyword) else originalKeys.distinct()
+        val rawContents = mutableListOf<String>()
+        for (lk in lookupKeys) {
+            db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf(lk)).use { cursor ->
+                while (cursor.moveToNext()) {
+                    rawContents.add(String(cursor.getBlob(0), Charsets.UTF_8))
                 }
+            }
+            // Fallback: try "@" prefix when search table missed and no entries found
+            if (rawContents.isEmpty() && originalKeys.isEmpty()) {
+                db.rawQuery("SELECT content FROM entries WHERE key = ?", arrayOf("@$keyword")).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        rawContents.add(String(cursor.getBlob(0), Charsets.UTF_8))
+                    }
+                }
+            }
+        }
+        if (rawContents.isEmpty()) return null
+
+        // Step 3: resolve each content — follow @@@LINK= redirects, keep real HTML
+        val resolved = rawContents.map { raw ->
+            val trimmed = raw.trimStart()
+            if (trimmed.startsWith("@@@LINK=")) {
+                val target = trimmed.removePrefix("@@@LINK=").trim().lines().firstOrNull()?.trim() ?: return@map null
+                if (maxDepth <= 1) {
+                    Log.w(TAG, "Redirect depth exceeded: $keyword → $target (dict=$dictId)")
+                    return@map "<p style='color:#999'>跳转次数过多</p>"
+                }
+                if (target.equals(keyword, ignoreCase = true)) {
+                    Log.w(TAG, "Self-redirect loop: $keyword (dict=$dictId)")
+                    return@map "<p style='color:#999'>词条循环引用</p>"
+                }
+                Log.d(TAG, "Redirect: $keyword → $target (dict=$dictId, depth=${4 - maxDepth})")
+                searchWithRedirect(target, dictId, maxDepth - 1) ?: return@map null
             } else {
-                null
+                raw
             }
-        }
-        if (raw == null) return null
+        }.filterNotNull()
 
-        // Step 3: handle @@@LINK= redirects
-        val trimmed = raw.trimStart()
-        if (trimmed.startsWith("@@@LINK=")) {
-            val target = trimmed.removePrefix("@@@LINK=").trim().lines().firstOrNull()?.trim() ?: return null
-            if (maxDepth <= 1) {
-                Log.w(TAG, "Redirect depth exceeded: $keyword → $target (dict=$dictId)")
-                return "<html><body><p style='color:#999;padding:16px'>跳转次数过多</p></body></html>"
-            }
-            if (target.equals(keyword, ignoreCase = true)) {
-                Log.w(TAG, "Self-redirect loop: $keyword (dict=$dictId)")
-                return "<html><body><p style='color:#999;padding:16px'>词条循环引用</p></body></html>"
-            }
-            Log.d(TAG, "Redirect: $keyword → $target (dict=$dictId, depth=${4 - maxDepth})")
-            return searchWithRedirect(target, dictId, maxDepth - 1)
-        }
-
-        return raw
+        return if (resolved.isEmpty()) null
+        else if (resolved.size == 1) resolved[0]
+        else resolved.joinToString("\n<hr style='border:0;border-top:1px solid #ddd;margin:16px 0'>\n")
     }
 
     /** Prefix-based autocomplete across all dictionaries. */
