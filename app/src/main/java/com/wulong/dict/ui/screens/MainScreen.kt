@@ -33,7 +33,7 @@ fun MainScreen(
     val (slogan, placeholder) = when (language) {
         Language.EN -> "Words build worlds." to "今天搜点什么好呢？"
         Language.JA -> "辞書は、もっと軽くていい。" to "何を調べますか？"
-        Language.DE -> "Wörter bauen Welten." to "Wonach möchten Sie suchen?"
+        Language.DE -> "Sprache ist der Schlüssel zur Welt." to "Wonach möchten Sie suchen?"
     }
 
     val sloganFont = when (language) {
