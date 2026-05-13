@@ -364,6 +364,15 @@ private fun rememberNestedScrollInterop(): NestedScrollConnection {
 
 // ─── HTML builder ─────────────────────────────────────────────────────────
 
+/** German noun gender (der/die/das) mapped to a CSS class suffix. */
+private val GENDER_RE = Regex("""<table[^>]*>.*?\b([mfn])\.\b.*?</table>""", RegexOption.DOT_MATCHES_ALL)
+
+private val GENDER_CSS = """
+    font.hw-m b { background: #1976d2; color: #fff; padding: 2px 10px; border-radius: 4px; }
+    font.hw-f b { background: #c62828; color: #fff; padding: 2px 10px; border-radius: 4px; }
+    font.hw-n b { background: #388e3c; color: #fff; padding: 2px 10px; border-radius: 4px; }
+""".trimIndent()
+
 private fun buildHtml(entry: DictionaryEntry, dictDir: File?): String {
     val (cssLinks, jsScripts) = if (dictDir != null && dictDir.isDirectory) {
         val files = dictDir.listFiles() ?: emptyArray()
@@ -375,6 +384,19 @@ private fun buildHtml(entry: DictionaryEntry, dictDir: File?): String {
     } else {
         "" to ""
     }
+
+    // Inject gender class into headword for German dictionaries
+    val genderClass = GENDER_RE.find(entry.htmlContent)?.groupValues?.get(1) ?: ""
+    val body = if (genderClass.isNotEmpty()) {
+        entry.htmlContent.replaceFirst(
+            """<font color="black">""",
+            """<font color="black" class="hw-$genderClass">"""
+        )
+    } else {
+        entry.htmlContent
+    }
+
+    val genderStyle = if (genderClass.isNotEmpty()) GENDER_CSS else ""
 
     return """
 <!DOCTYPE html>
@@ -393,11 +415,12 @@ $cssLinks
     background: #fff;
     word-wrap: break-word;
   }
+  $genderStyle
   img { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
-${entry.htmlContent}
+$body
 </body>
 $jsScripts
 </html>
