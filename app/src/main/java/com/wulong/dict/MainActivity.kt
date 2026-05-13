@@ -75,9 +75,17 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() },
                             onLanguageChanged = { newCode ->
                                 container.switchLanguage(newCode)
-                                recreate()
+                                viewModel.onEnterSearch()
+                                navController.navigate(NavRoutes.MAIN) {
+                                    popUpTo(NavRoutes.MAIN) { inclusive = true }
+                                }
                             },
-                            onRestartRequested = { recreate() }
+                            onRestartRequested = {
+                                viewModel.onEnterSearch()
+                                navController.navigate(NavRoutes.MAIN) {
+                                    popUpTo(NavRoutes.MAIN) { inclusive = true }
+                                }
+                            }
                         )
                     }
                     composable(NavRoutes.SEARCH) {

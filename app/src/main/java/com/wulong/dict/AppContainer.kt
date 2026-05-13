@@ -97,7 +97,7 @@ class AppContainer(context: Context, val languageSettings: LanguageSettings, ini
     private val ioDispatcher = kotlinx.coroutines.Dispatchers.IO
 
     val dictionaryRepository: DictionaryRepository = DictionaryRepositoryImpl(
-        dictEngine = dictEngine,
+        dictEngineProvider = { dictEngine },
         ioDispatcher = ioDispatcher
     )
 

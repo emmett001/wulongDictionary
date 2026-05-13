@@ -11,9 +11,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 
 class DictionaryRepositoryImpl(
-    private val dictEngine: SqliteDictEngine,
+    private val dictEngineProvider: () -> SqliteDictEngine,
     private val ioDispatcher: CoroutineDispatcher
 ) : DictionaryRepository {
+
+    private val dictEngine: SqliteDictEngine get() = dictEngineProvider()
 
     companion object {
         private const val TAG = "DictRepo"
