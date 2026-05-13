@@ -63,6 +63,12 @@ class SqliteDictEngine(private val dictRootDir: File) {
 
     companion object {
         private const val TAG = "SqliteDictEngine"
+
+        /** Matches a &lt;table&gt; grammar bar containing m./f./n. (German noun gender). */
+        private val GENDER_RE = Regex("""<table[^>]*>.*?\b([mfn])\.\s.*?</table>""", RegexOption.DOT_MATCHES_ALL)
+
+        /** Matches the headword &lt;font&gt; tag (may have extra attrs like size=+0). */
+        private val GENDER_TAG_RE = Regex("""<font color="black"(?:\s[^>]*)?>""")
     }
 
     fun resolveDbFile(config: DictConfig): File = File(dictRootDir, config.dbRelPath)
@@ -169,29 +175,40 @@ class SqliteDictEngine(private val dictRootDir: File) {
         }
         if (rawContents.isEmpty()) return null
 
-        // Step 3: resolve each content — follow @@@LINK= redirects, keep real HTML
+        // Step 3: resolve each content — follow @@@LINK= redirects, inject gender class
         val resolved = rawContents.map { raw ->
-            val trimmed = raw.trimStart()
-            if (trimmed.startsWith("@@@LINK=")) {
-                val target = trimmed.removePrefix("@@@LINK=").trim().lines().firstOrNull()?.trim() ?: return@map null
-                if (maxDepth <= 1) {
-                    Log.w(TAG, "Redirect depth exceeded: $keyword → $target (dict=$dictId)")
-                    return@map "<p style='color:#999'>跳转次数过多</p>"
-                }
-                if (target.equals(keyword, ignoreCase = true)) {
-                    Log.w(TAG, "Self-redirect loop: $keyword (dict=$dictId)")
-                    return@map "<p style='color:#999'>词条循环引用</p>"
-                }
-                Log.d(TAG, "Redirect: $keyword → $target (dict=$dictId, depth=${4 - maxDepth})")
-                searchWithRedirect(target, dictId, maxDepth - 1) ?: return@map null
-            } else {
-                raw
-            }
+            val resolved = resolveEntry(raw, keyword, dictId, maxDepth) ?: return@map null
+            injectGenderClass(resolved)
         }.filterNotNull()
 
         return if (resolved.isEmpty()) null
         else if (resolved.size == 1) resolved[0]
         else resolved.joinToString("\n<hr style='border:0;border-top:1px solid #ddd;margin:16px 0'>\n")
+    }
+
+    /** Follow a single @@@LINK= redirect. Returns resolved HTML or null. */
+    private fun resolveEntry(raw: String, keyword: String, dictId: Int, maxDepth: Int): String? {
+        val trimmed = raw.trimStart()
+        if (!trimmed.startsWith("@@@LINK=")) return raw
+        val target = trimmed.removePrefix("@@@LINK=").trim().lines().firstOrNull()?.trim() ?: return null
+        if (maxDepth <= 1) {
+            Log.w(TAG, "Redirect depth exceeded: $keyword -> $target (dict=$dictId)")
+            return "<p style='color:#999'>跳转次数过多</p>"
+        }
+        if (target.equals(keyword, ignoreCase = true)) {
+            Log.w(TAG, "Self-redirect loop: $keyword (dict=$dictId)")
+            return "<p style='color:#999'>词条循环引用</p>"
+        }
+        Log.d(TAG, "Redirect: $keyword -> $target (dict=$dictId, depth=${4 - maxDepth})")
+        return searchWithRedirect(target, dictId, maxDepth - 1)
+            ?.let { injectGenderClass(it) }
+    }
+
+    /** Inject CSS class into the headword &lt;font&gt; tag for German gender colour coding. */
+    private fun injectGenderClass(html: String): String {
+        val m = GENDER_RE.find(html) ?: return html
+        val gender = m.groupValues[1]
+        return html.replaceFirst(GENDER_TAG_RE, """<font color="black" class="hw-$gender">""")
     }
 
     /** Prefix-based autocomplete across all dictionaries. */
