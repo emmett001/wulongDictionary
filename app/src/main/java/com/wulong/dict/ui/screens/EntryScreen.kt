@@ -400,7 +400,7 @@ $cssLinks
     word-wrap: break-word;
   }
   $GENDER_CSS
-  img { max-width: 100%; height: auto; border: 0; }
+  img { max-width: 100%; height: auto; border: 0 !important; min-width: 0 !important; min-height: 0 !important; }
 </style>
 </head>
 <body>

@@ -27,17 +27,8 @@ class WebViewPool(
     private val available = Stack<WebView>()
     private val lock = Any()
 
-    /** 1×1 transparent PNG — served as fallback for missing images. */
-    private val transparentPixel = byteArrayOf(
-        0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15.toByte(), 0xC4.toByte(), 0x89.toByte(),
-        0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C.toByte(),
-        0x62, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xE5.toByte(), 0x27.toByte(),
-        0xDE.toByte(), 0x1F.toByte(), 0xC5.toByte(),
-        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE.toByte(), 0x42, 0x60,
-        0x82.toByte()
-    )
+    /** Empty SVG — served as fallback for missing images so they collapse to zero size. */
+    private val emptyPlaceholder = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>".toByteArray()
 
     private fun imageMime(path: String): String = when {
         path.endsWith(".png", ignoreCase = true) -> "image/png"
@@ -140,11 +131,10 @@ class WebViewPool(
                     // If the file exists on disk, let it load normally
                     if (File(path).exists()) return null
 
-                    // File not on disk (likely inside .mdd archive):
-                    // Return 1×1 transparent PNG to prevent broken-image icon
+                    // File not on disk — return empty SVG so it collapses to zero size
                     return WebResourceResponse(
-                        "image/png", "UTF-8",
-                        ByteArrayInputStream(transparentPixel)
+                        "image/svg+xml", "UTF-8",
+                        ByteArrayInputStream(emptyPlaceholder)
                     )
                 }
             }
