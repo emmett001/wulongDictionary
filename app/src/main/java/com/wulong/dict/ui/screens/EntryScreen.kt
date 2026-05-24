@@ -401,6 +401,8 @@ $cssLinks
   }
   $GENDER_CSS
   img { max-width: 100%; height: auto; border: 0 !important; min-width: 0 !important; min-height: 0 !important; }
+  #ox-enlarge .ox-enlarge-label { display: none !important; }
+  #ox-enlarge .topic { pointer-events: none !important; }
 </style>
 </head>
 <body>
