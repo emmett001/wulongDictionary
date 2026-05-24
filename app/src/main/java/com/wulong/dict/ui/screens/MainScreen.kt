@@ -34,7 +34,7 @@ fun MainScreen(
         Language.EN -> "Words build worlds." to "今天搜点什么好呢？"
         Language.JA -> "辞書は、もっと軽くていい。" to "何を調べますか？"
         Language.DE -> "Sprache ist der Schlüssel zur Welt." to "Wonach möchten Sie suchen?"
-        Language.KO -> "아는 만큼 보인다" to "무엇을 찾으시나요?"
+        Language.KO -> "한 단어의 깊이" to "무엇을 찾으시나요?"
     }
 
     val sloganFont = when (language) {
