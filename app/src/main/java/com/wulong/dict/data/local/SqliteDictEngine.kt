@@ -82,14 +82,13 @@ class SqliteDictEngine(private val dictRootDir: File) {
 
         var nextId = 0
         for (dir in dirs) {
-            // Try first-level match; if absent, peek one level deeper
+            // Try first-level match; if absent, search all direct subdirectories
             // (source ZIPs sometimes add an extra wrapper directory).
             val sqliteFile = dir.listFiles()?.find { it.name.endsWith(".sqlite3") }
                 ?: dir.listFiles()
                     ?.filter { it.isDirectory }
+                    ?.mapNotNull { it.listFiles()?.find { f -> f.name.endsWith(".sqlite3") } }
                     ?.firstOrNull()
-                    ?.listFiles()
-                    ?.find { it.name.endsWith(".sqlite3") }
                 ?: continue
 
             val metaDir = sqliteFile.parentFile ?: continue

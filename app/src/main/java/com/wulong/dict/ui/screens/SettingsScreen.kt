@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -61,7 +63,7 @@ fun SettingsScreen(
     var renameText by remember { mutableStateOf("") }
 
     // Force recompose when engine configs change
-    val dictConfigs = remember(dictRefreshKey, appContainer.dictEngine.configs.size) {
+    val dictConfigs = remember(dictRefreshKey) {
         appContainer.dictEngine.configs
     }
 
@@ -137,6 +139,7 @@ fun SettingsScreen(
                                 }
                                 isImporting = false
                                 statusText = result
+                                dictRefreshKey++
                                 if (result.startsWith("导入完成")) {
                                     showRestartDialog = true
                                 }
@@ -271,6 +274,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp)
         ) {
             // ── Dictionary management ───────────────────────────────
@@ -554,12 +558,23 @@ private fun importFromFolder(
 
     srcRoot.listFiles().forEach { child ->
         if (child.isDirectory) {
-            try {
-                copied += copyDir(context, child, targetRoot) { n ->
-                    onProgress(copied + n, totalFiles)
+            // If the selected folder contains a wrapper dir named after a
+            // language code (en/ja/de/ko), flatten it — import its
+            // contents instead of the wrapper directory itself.
+            val langCodes = setOf("en", "ja", "de", "ko")
+            val children = if (child.name in langCodes && child.isDirectory) {
+                child.listFiles().filter { it.isDirectory }.toList()
+            } else {
+                listOf(child)
+            }
+            for (c in children) {
+                try {
+                    copied += copyDir(context, c, targetRoot) { n ->
+                        onProgress(copied + n, totalFiles)
+                    }
+                } catch (e: Exception) {
+                    errors.add("${c.name}: ${e.message}")
                 }
-            } catch (e: Exception) {
-                errors.add("${child.name}: ${e.message}")
             }
         }
     }
