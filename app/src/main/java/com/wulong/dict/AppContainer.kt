@@ -26,8 +26,13 @@ class AppContainer(context: Context, val languageSettings: LanguageSettings, ini
     var language: Language = Language.fromCode(initialLanguageCode)
         private set
 
-    private fun dictRootFor(lang: Language) =
-        appContext.getExternalFilesDir(null)!!.resolve("dicts/${lang.code}")
+    private fun dictRootFor(lang: Language): File {
+        val dictsDir = appContext.getExternalFilesDir(null)!!.resolve("dicts")
+        if (dictsDir.mkdirs()) {
+            dictsDir.resolve(".nomedia").createNewFile()
+        }
+        return dictsDir.resolve(lang.code)
+    }
 
     // ── Dictionary order ─────────────────────────────────────────────────
     val dictionaryOrderSettings = DictionaryOrderSettings(appContext)

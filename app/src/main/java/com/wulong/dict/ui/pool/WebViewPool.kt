@@ -2,6 +2,7 @@ package com.wulong.dict.ui.pool
 
 import android.content.Context
 import android.graphics.Color
+import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
@@ -131,7 +132,7 @@ class WebViewPool(
 
                     if (url.scheme != "file") return null
 
-                    val path = url.path ?: return null
+                    val path = Uri.decode(url.path ?: return null)
 
                     // Only intercept image/icon requests
                     if (!imageMime(path).startsWith("image/")) return null

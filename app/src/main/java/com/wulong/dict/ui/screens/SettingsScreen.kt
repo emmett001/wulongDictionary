@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.*
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,8 @@ fun SettingsScreen(
     var pendingUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var dictRefreshKey by remember { mutableStateOf(0) }
     var deleteTarget by remember { mutableStateOf<SqliteDictEngine.DictConfig?>(null) }
+    var renameTarget by remember { mutableStateOf<SqliteDictEngine.DictConfig?>(null) }
+    var renameText by remember { mutableStateOf("") }
 
     // Force recompose when engine configs change
     val dictConfigs = remember(dictRefreshKey, appContainer.dictEngine.configs.size) {
@@ -210,6 +213,40 @@ fun SettingsScreen(
         )
     }
 
+    // ── Rename dialog ──────────────────────────────────────────────────
+    val configToRename = renameTarget
+    if (configToRename != null) {
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text("修改词典名称") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text("名称") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newName = renameText.trim()
+                    if (newName.isNotBlank()) {
+                        appContainer.dictEngine.updateDictName(configToRename, newName)
+                        dictRefreshKey++
+                    }
+                    renameTarget = null
+                }) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameTarget = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = WulongColors.Background,
         topBar = {
@@ -329,6 +366,20 @@ fun SettingsScreen(
                                     color = WulongColors.Placeholder,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            // Rename button
+                            IconButton(
+                                onClick = {
+                                    renameText = config.shortName
+                                    renameTarget = config
+                                }
+                            ) {
+                                Text(
+                                    "✏",
+                                    fontSize = 16.sp,
+                                    color = WulongColors.Placeholder
                                 )
                             }
 
@@ -513,6 +564,10 @@ private fun importFromFolder(
         }
     }
 
+    // Prevent media scanner from indexing dict resources into gallery
+    File(context.getExternalFilesDir(null), "dicts/.nomedia").createNewFile()
+    File(targetRoot, ".nomedia").createNewFile()
+
     // Reinitialize engine only if we imported to the current language
     if (langCode == appContainer.language.code) {
         try {
@@ -554,7 +609,7 @@ private fun copyDir(
 
     src.listFiles().forEach { child ->
         if (child.isDirectory) {
-            count += copyDir(context, child, targetRoot) { n -> onFileCopied(count + n) }
+            count += copyDir(context, child, subDir) { n -> onFileCopied(count + n) }
         } else {
             val destFile = File(subDir, child.name ?: return@forEach)
             context.contentResolver.openInputStream(child.uri)?.use { input ->

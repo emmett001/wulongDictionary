@@ -82,13 +82,23 @@ class SqliteDictEngine(private val dictRootDir: File) {
 
         var nextId = 0
         for (dir in dirs) {
-            val sqliteFile = dir.listFiles()?.find { it.name.endsWith(".sqlite3") } ?: continue
-            val meta = readDictJson(dir)
+            // Try first-level match; if absent, peek one level deeper
+            // (source ZIPs sometimes add an extra wrapper directory).
+            val sqliteFile = dir.listFiles()?.find { it.name.endsWith(".sqlite3") }
+                ?: dir.listFiles()
+                    ?.filter { it.isDirectory }
+                    ?.firstOrNull()
+                    ?.listFiles()
+                    ?.find { it.name.endsWith(".sqlite3") }
+                ?: continue
+
+            val metaDir = sqliteFile.parentFile ?: continue
+            val meta = readDictJson(metaDir)
             val dbRelPath = sqliteFile.relativeTo(dictRootDir).path
             result.add(
                 DictConfig(
-                    shortName = meta.shortName ?: dir.name,
-                    fullName = meta.fullName ?: dir.name,
+                    shortName = meta.shortName ?: metaDir.name,
+                    fullName = meta.fullName ?: metaDir.name,
                     id = nextId,
                     dbRelPath = dbRelPath
                 )
@@ -112,6 +122,20 @@ class SqliteDictEngine(private val dictRootDir: File) {
         } catch (_: Exception) {
             DictMeta(null, null)
         }
+    }
+
+    fun updateDictName(config: DictConfig, newName: String) {
+        val metaDir = resolveDbFile(config).parentFile ?: return
+        val jsonFile = File(metaDir, "dict.json")
+        val obj = if (jsonFile.isFile) {
+            try { org.json.JSONObject(jsonFile.readText()) } catch (_: Exception) { org.json.JSONObject() }
+        } else {
+            org.json.JSONObject()
+        }
+        obj.put("shortName", newName)
+        jsonFile.writeText(obj.toString(2))
+        // Update in-memory config for immediate UI refresh
+        configs = configs.map { if (it.id == config.id) it.copy(shortName = newName) else it }
     }
 
     fun open() {

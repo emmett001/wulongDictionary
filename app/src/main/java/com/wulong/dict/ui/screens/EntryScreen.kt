@@ -318,7 +318,7 @@ private fun DictPage(
 }
 
 private fun loadEntryHtml(webView: WebView, entry: DictionaryEntry, dictDir: File?) {
-    val baseUrl = if (dictDir != null) "file://${dictDir.absolutePath}/" else null
+    val baseUrl = if (dictDir != null) "file://" + Uri.encode(dictDir.absolutePath, "/") + "/" else null
     webView.loadDataWithBaseURL(
         baseUrl,
         buildHtml(entry, dictDir),
