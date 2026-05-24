@@ -55,7 +55,6 @@ fun SettingsScreen(
     var importProgress by remember { mutableStateOf(0f) }
     var importDetail by remember { mutableStateOf("") }
     var showConfirmDialog by remember { mutableStateOf(false) }
-    var showLangDialog by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var dictRefreshKey by remember { mutableStateOf(0) }
     var deleteTarget by remember { mutableStateOf<SqliteDictEngine.DictConfig?>(null) }
@@ -85,12 +84,34 @@ fun SettingsScreen(
             },
             title = { Text("导入词典文件？") },
             text = {
-                Text("将从所选文件夹中复制所有词典文件（数据库、样式、图片等）到应用目录。\n\n这可能需要几秒钟。")
+                Text("将从所选文件夹中复制所有词典文件（数据库、样式、图片等）到「${appContainer.language.displayName}」词典目录。\n\n这可能需要几秒钟。")
             },
             confirmButton = {
                 TextButton(onClick = {
                     showConfirmDialog = false
-                    showLangDialog = true
+                    val uri = pendingUri ?: return@TextButton
+                    pendingUri = null
+                    val langCode = appContainer.language.code
+                    scope.launch {
+                        statusText = ""
+                        isImporting = true
+                        importProgress = 0f
+                        importDetail = "正在扫描文件…"
+                        val result = withContext(Dispatchers.IO) {
+                            importFromFolder(context, uri, langCode, appContainer) { done, total ->
+                                launch(Dispatchers.Main) {
+                                    importProgress = done.toFloat() / total
+                                    importDetail = "正在复制 $done / $total"
+                                }
+                            }
+                        }
+                        isImporting = false
+                        statusText = result
+                        dictRefreshKey++
+                        if (result.startsWith("导入完成")) {
+                            showRestartDialog = true
+                        }
+                    }
                 }) {
                     Text("继续")
                 }
@@ -98,62 +119,6 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = {
                     showConfirmDialog = false
-                    pendingUri = null
-                }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
-    // ── Language selection dialog ────────────────────────────────────
-    if (showLangDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showLangDialog = false
-                pendingUri = null
-            },
-            title = { Text("选择词典语言") },
-            text = {
-                Text("这些词典将导入到哪种语言的数据目录下？")
-            },
-            confirmButton = {
-                Row {
-                    Language.entries.forEach { lang ->
-                        TextButton(onClick = {
-                            showLangDialog = false
-                            val uri = pendingUri ?: return@TextButton
-                            pendingUri = null
-                            scope.launch {
-                                statusText = ""
-                                isImporting = true
-                                importProgress = 0f
-                                importDetail = "正在扫描文件…"
-                                val result = withContext(Dispatchers.IO) {
-                                    importFromFolder(context, uri, lang.code, appContainer) { done, total ->
-                                        launch(Dispatchers.Main) {
-                                            importProgress = done.toFloat() / total
-                                            importDetail = "正在复制 $done / $total"
-                                        }
-                                    }
-                                }
-                                isImporting = false
-                                statusText = result
-                                dictRefreshKey++
-                                if (result.startsWith("导入完成")) {
-                                    showRestartDialog = true
-                                }
-                            }
-                        }) {
-                            Text(lang.displayName)
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showLangDialog = false
                     pendingUri = null
                 }) {
                     Text("取消")
