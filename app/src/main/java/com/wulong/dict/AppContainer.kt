@@ -1,6 +1,7 @@
 package com.wulong.dict
 
 import android.content.Context
+import com.wulong.dict.data.local.ActivationSettings
 import com.wulong.dict.data.local.AppDatabase
 import com.wulong.dict.data.local.DictionaryOrderSettings
 import com.wulong.dict.data.local.LanguageSettings
@@ -86,6 +87,10 @@ class AppContainer(context: Context, val languageSettings: LanguageSettings, ini
         dictEngine = createEngine(language)
         dictEngine.open()
     }
+
+    // ── Activation ────────────────────────────────────────────────────────
+    val activationSettings = ActivationSettings(appContext)
+    val activationServerUrl = "http://47.102.186.16/wulong"
 
     // ── WebView pool ──────────────────────────────────────────────────────
 

@@ -15,12 +15,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.wulong.dict.navigation.NavRoutes
+import com.wulong.dict.ui.screens.ActivationScreen
 import com.wulong.dict.ui.screens.EntryScreen
 import com.wulong.dict.ui.screens.MainScreen
 import com.wulong.dict.ui.screens.SearchScreen
 import com.wulong.dict.ui.screens.SearchViewModel
 import com.wulong.dict.ui.screens.SettingsScreen
 import com.wulong.dict.ui.theme.WulongDictTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
 
@@ -50,13 +53,32 @@ class MainActivity : ComponentActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        val isActivated = runBlocking {
+            container.activationSettings.isActivated.first()
+        }
+        val needActivation = !isActivated
+
         setContent {
             WulongDictTheme {
                 val navController = rememberNavController()
                 NavHost(
                     navController = navController,
-                    startDestination = NavRoutes.MAIN
+                    startDestination = if (needActivation) NavRoutes.ACTIVATION else NavRoutes.MAIN
                 ) {
+                    composable(NavRoutes.ACTIVATION) {
+                        ActivationScreen(
+                            language = container.language,
+                            serverUrl = container.activationServerUrl,
+                            onActivated = { inviteNo ->
+                                runBlocking {
+                                    container.activationSettings.setActivated(inviteNo)
+                                }
+                                navController.navigate(NavRoutes.MAIN) {
+                                    popUpTo(NavRoutes.ACTIVATION) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
                     composable(NavRoutes.MAIN) {
                         MainScreen(
                             language = container.language,

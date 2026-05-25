@@ -3,9 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:requestLegacyExternalStorage="true"
+        android:usesCleartextTraffic="true"
         android:name=".WulongDictApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
