@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>乌龙词典 · 密钥管理</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,"Noto Sans SC",system-ui,sans-serif;background:#FDFBF7;padding:24px;color:#3A3A3A}
+  .container{max-width:960px;margin:0 auto}
+  h1{font-size:22px;letter-spacing:4px;margin-bottom:4px}
+  .sub{color:#A8A29B;font-size:12px;margin-bottom:20px}
+  .toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  input,button,select{padding:8px 14px;border:1px solid #E8E3DA;border-radius:6px;font-size:13px;background:#fff;outline:none}
+  input:focus{border-color:#5B3E96}
+  button{background:#5B3E96;color:#fff;border:none;cursor:pointer;letter-spacing:1px}
+  button:hover{background:#4A2F80}
+  button.ghost{background:transparent;color:#5B3E96;border:1px solid #5B3E96}
+  button.danger{background:#c62828}
+  .stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .stat{flex:1;min-width:90px;background:#fff;border:1px solid #E8E3DA;border-radius:8px;padding:12px 16px;text-align:center}
+  .stat .num{font-size:24px;font-weight:700;color:#5B3E96}
+  .stat .lbl{font-size:11px;color:#A8A29B}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #E8E3DA;border-radius:8px;overflow:hidden}
+  th{background:#F5F1E6;padding:10px 12px;font-size:12px;text-align:left;font-weight:600;letter-spacing:1px}
+  td{padding:10px 12px;font-size:13px;border-top:1px solid #F0EDE5}
+  tr:hover td{background:#FDFBF7}
+  .code{font-family:'SF Mono','Menlo',monospace;letter-spacing:2px;color:#5B3E96;font-weight:600}
+  .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600}
+  .b-activated{background:#E8F5E9;color:#2E7D32}
+  .b-pending{background:#FFF3E0;color:#E65100}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#3A3A3A;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;z-index:99;opacity:0;transition:opacity .3s}
+  .toast.show{opacity:1}
+  .auth{background:#fff;border:1px solid #E8E3DA;border-radius:8px;padding:20px;margin-bottom:20px;display:flex;gap:10px;align-items:center}
+  .auth input{flex:1}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>乌龙词典 · 密钥管理</h1>
+  <p class="sub">服务器实时数据</p>
+
+  <div id="authBox" class="auth">
+    <input id="adminKey" type="password" placeholder="管理员密钥" onkeydown="if(event.key==='Enter')loadData()">
+    <button onclick="loadData()">连接服务器</button>
+  </div>
+
+  <div id="mainPanel" class="hidden">
+    <div class="stats">
+      <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">总生成</div></div>
+      <div class="stat"><div class="num" id="statActivated">0</div><div class="lbl">已激活</div></div>
+      <div class="stat"><div class="num" id="statPending">0</div><div class="lbl">未激活</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input id="searchInput" type="text" placeholder="搜索编号或名称…" oninput="renderTable()">
+      <select id="statusFilter" onchange="renderTable()">
+        <option value="all">全部</option><option value="1">已激活</option><option value="0">未激活</option>
+      </select>
+      <button onclick="loadData()">🔄 刷新</button>
+      <button class="ghost" onclick="exportCSV()">导出 CSV</button>
+    </div>
+
+    <table>
+      <thead><tr><th>编号</th><th>名称</th><th>激活码</th><th>设备</th><th>激活时间</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let records = [];
+let adminKey = '';
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+
+async function loadData(){
+  if(!adminKey) adminKey = document.getElementById('adminKey').value.trim();
+  if(!adminKey){toast('请输入管理员密钥');return}
+  try{
+    const resp = await fetch('/wulong/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:adminKey})});
+    const data = await resp.json();
+    if(!data.ok){toast(data.msg);return}
+    records = data.records || [];
+    document.getElementById('authBox').classList.add('hidden');
+    document.getElementById('mainPanel').classList.remove('hidden');
+    renderTable();
+    toast(`已加载 ${records.length} 条记录`);
+  }catch(e){toast('连接失败: '+e.message)}
+}
+
+function renderTable(){
+  const search = (document.getElementById('searchInput').value||'').toLowerCase();
+  const filter = document.getElementById('statusFilter').value;
+  let filtered = records.filter(r=>{
+    if(search && !(r.invite_no||'').includes(search) && !(r.name||'').toLowerCase().includes(search)) return false;
+    if(filter==='1' && !r.activated) return false;
+    if(filter==='0' && r.activated) return false;
+    return true;
+  });
+
+  const activated = records.filter(r=>r.activated).length;
+  const distributed = records.filter(r=>r.distributed).length;
+  document.getElementById('statTotal').textContent = distributed;
+  document.getElementById('statActivated').textContent = activated;
+  document.getElementById('statPending').textContent = distributed - activated;
+
+  document.getElementById('tbody').innerHTML = filtered.map(r=>{
+    let statusLabel, statusClass;
+    if (r.activated) { statusLabel='已激活'; statusClass='b-activated'; }
+    else if (r.distributed) { statusLabel='已分发'; statusClass='b-pending'; }
+    else { statusLabel='未知'; statusClass=''; }
+    return `
+    <tr>
+      <td>${r.invite_no}</td>
+      <td>${r.name||'-'}</td>
+      <td><span class="code">${r.code||'-'}</span></td>
+      <td><code style="font-size:11px;color:#A8A29B">${r.device_id||'-'}</code></td>
+      <td style="font-size:11px;color:#A8A29B">${r.activated_at ? new Date(r.activated_at*1000).toLocaleString('zh-CN') : '-'}</td>
+      <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+      <td>${r.activated?`<button class="danger" style="padding:3px 8px;font-size:11px" onclick="migrate('${r.invite_no}')">重置</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function migrate(no){
+  if(!confirm(`确定要解绑 ${no} 吗？用户可以用新设备重新激活。`)) return;
+  try{
+    const resp = await fetch('/wulong/migrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_key:adminKey,invite_no:no})});
+    const data = await resp.json();
+    toast(data.msg);
+    if(data.ok) loadData();
+  }catch(e){toast('操作失败: '+e.message)}
+}
+
+function exportCSV(){
+  const csv = '编号,设备ID,激活时间,状态\n'+records.map(r=>`${r.invite_no},${r.device_id||''},${r.activated_at?new Date(r.activated_at*1000).toISOString():''},${r.activated?'已激活':'未激活'}`).join('\n');
+  const blob = new Blob(['﻿'+csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='激活记录.csv';a.click()
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>乌龙词典 · 密钥管理</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Noto Sans SC", system-ui, sans-serif;
+    background: #FDFBF7; padding: 24px; color: #3A3A3A;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 22px; letter-spacing: 4px; margin-bottom: 4px; }
+  .sub { color: #A8A29B; font-size: 12px; margin-bottom: 20px; }
+
+  .toolbar {
+    display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+  }
+  input, button, select {
+    padding: 8px 14px; border: 1px solid #E8E3DA; border-radius: 6px;
+    font-size: 13px; background: #fff; outline: none;
+  }
+  input:focus { border-color: #5B3E96; }
+  button {
+    background: #5B3E96; color: #fff; border: none; cursor: pointer;
+    letter-spacing: 1px;
+  }
+  button:hover { background: #4A2F80; }
+  button.ghost { background: transparent; color: #5B3E96; border: 1px solid #5B3E96; }
+
+  .stats {
+    display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .stat {
+    flex: 1; min-width: 100px;
+    background: #fff; border: 1px solid #E8E3DA; border-radius: 8px;
+    padding: 12px 16px; text-align: center;
+  }
+  .stat .num { font-size: 24px; font-weight: 700; color: #5B3E96; }
+  .stat .lbl { font-size: 11px; color: #A8A29B; }
+
+  table {
+    width: 100%; border-collapse: collapse;
+    background: #fff; border: 1px solid #E8E3DA; border-radius: 8px;
+    overflow: hidden;
+  }
+  th { background: #F5F1E6; padding: 10px 12px; font-size: 12px; text-align: left; font-weight: 600; letter-spacing: 1px; }
+  td { padding: 10px 12px; font-size: 13px; border-top: 1px solid #F0EDE5; }
+  tr:hover td { background: #FDFBF7; }
+  .code { font-family: 'SF Mono', 'Menlo', monospace; letter-spacing: 2px; color: #5B3E96; font-weight: 600; }
+  .status { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .s-activated { background: #E8F5E9; color: #2E7D32; }
+  .s-pending  { background: #FFF3E0; color: #E65100; }
+  .s-unknown  { background: #ECEFF1; color: #607D8B; }
+
+  .empty { text-align: center; padding: 40px; color: #A8A29B; font-size: 14px; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #3A3A3A; color: #fff; padding: 10px 24px;
+    border-radius: 8px; font-size: 13px; z-index: 99;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>乌龙词典 · 密钥管理</h1>
+  <p class="sub">所有已生成分发出去的激活码</p>
+
+  <div class="stats">
+    <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">总生成</div></div>
+    <div class="stat"><div class="num" id="statActivated">-</div><div class="lbl">已激活</div></div>
+    <div class="stat"><div class="num" id="statPending">-</div><div class="lbl">待激活</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input id="searchInput" type="text" placeholder="搜索编号或姓名…" oninput="render()">
+    <select id="statusFilter" onchange="render()">
+      <option value="all">全部状态</option>
+      <option value="activated">已激活</option>
+      <option value="pending">待激活</option>
+    </select>
+    <button class="ghost" onclick="importRecords()">导入 records.json</button>
+    <button class="ghost" onclick="exportCSV()">导出 CSV</button>
+  </div>
+
+  <table id="table">
+    <thead><tr>
+      <th>邀请编号</th><th>姓名</th><th>激活码</th><th>状态</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty">加载中…</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SECRET = "187524a3384f3f28164e2a0fc1f8cca3";
+const SERVER = "http://47.102.186.16/wulong";
+
+// ── 从邀请函目录扫描已生成的记录 ──────────────────
+// 此数据由 generate_invitation.py 写入 server-activation/records.json
+// 也可以通过扫描 邀请函/ 目录结构来获取
+
+let records = [];
+
+// 从 localStorage 加载记录（持久化）
+function loadRecords() {
+  const saved = localStorage.getItem("wulong_keys");
+  if (saved) {
+    try { records = JSON.parse(saved); } catch(e) {}
+  }
+}
+
+function saveRecords() {
+  localStorage.setItem("wulong_keys", JSON.stringify(records));
+}
+
+function addRecord(no, name, code) {
+  const exists = records.find(r => r.no === no);
+  if (exists) {
+    exists.name = name;
+    exists.code = code;
+    exists.updated = new Date().toISOString();
+  } else {
+    records.push({ no, name, code, status: 'unknown', device: '', createdAt: new Date().toISOString() });
+  }
+  records.sort((a, b) => a.no.localeCompare(b.no));
+  saveRecords();
+  render();
+}
+
+// ── 渲染表格 ──────────────────────────────────────
+function render() {
+  const search = (document.getElementById("searchInput").value || "").toLowerCase();
+  const filter = document.getElementById("statusFilter").value;
+
+  let filtered = records.filter(r => {
+    if (search && !r.no.includes(search) && !r.name.toLowerCase().includes(search)) return false;
+    if (filter === 'activated' && r.status !== 'activated') return false;
+    if (filter === 'pending' && (r.status === 'activated')) return false;
+    return true;
+  });
+
+  document.getElementById("statTotal").textContent = records.length;
+  const activated = records.filter(r => r.status === 'activated').length;
+  document.getElementById("statActivated").textContent = activated;
+  document.getElementById("statPending").textContent = records.length - activated;
+
+  const tbody = document.getElementById("tbody");
+  const empty = document.getElementById("empty");
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    empty.textContent = records.length === 0 ? '暂无记录。生成邀请函后，点下方按钮手动录入。' : '无匹配记录';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = filtered.map(r => `
+      <tr>
+        <td>${r.no}</td>
+        <td>${r.name}</td>
+        <td><span class="code">${r.code}</span> <button style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="copyCode('${r.code}')">复制</button></td>
+        <td>
+          <select class="status" onchange="setStatus('${r.no}', this.value)" style="padding:2px 6px;font-size:11px;border-radius:4px;border:1px solid #E8E3DA">
+            <option value="unknown" ${r.status==='unknown'?'selected':''}>未知</option>
+            <option value="pending" ${r.status==='pending'?'selected':''}>待激活</option>
+            <option value="activated" ${r.status==='activated'?'selected':''}>已激活</option>
+          </select>
+        </td>
+      </tr>
+    `).join('');
+  }
+}
+
+function setStatus(no, status) {
+  const r = records.find(r => r.no === no);
+  if (r) { r.status = status; saveRecords(); render(); }
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code).then(() => toast('已复制: ' + code));
+}
+
+function exportCSV() {
+  const csv = '编号,姓名,激活码,状态\n' + records.map(r => `${r.no},${r.name},${r.code},${r.status}`).join('\n');
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = '乌龙词典_密钥管理.csv'; a.click();
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+// ── 手动录入 ──────────────────────────────────────
+function manualAdd() {
+  const no = prompt("邀请编号（如 0023）：");
+  if (!no) return;
+  const name = prompt("姓名：");
+  if (!name) return;
+  const code = prompt("激活码（留空自动计算）：") || makeCode(no);
+  addRecord(no, name, code);
+}
+
+async function makeCode(no) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(SECRET), {name:"HMAC", hash:"SHA-256"}, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(no));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2,"0")).join("").slice(0,8);
+}
+
+function importRecords() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        for (const r of imported) {
+          const exists = records.find(x => x.no === r.no);
+          if (exists) {
+            if (r.name) exists.name = r.name;
+            if (r.code) exists.code = r.code;
+            if (r.status && r.status !== 'unknown') exists.status = r.status;
+          } else {
+            records.push(r);
+          }
+        }
+        records.sort((a,b) => a.no.localeCompare(b.no));
+        saveRecords();
+        render();
+        toast('已导入 ' + imported.length + ' 条记录');
+      } catch(err) { toast('解析失败: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ── 初始化 ────────────────────────────────────────
+loadRecords();
+render();
+
+// 暴露到全局供 HTML onclick 使用
+window.copyCode = copyCode;
+window.setStatus = setStatus;
+
+// 页面底部添加手动录入按钮
+document.querySelector('.toolbar').insertAdjacentHTML('beforeend',
+  '<button onclick="manualAdd()" style="background:#4CAF50">+ 手动录入</button>');
+window.manualAdd = manualAdd;
+</script>
+</body>
+</html>
