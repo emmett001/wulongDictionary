@@ -35,6 +35,7 @@ fun MainScreen(
         Language.JA -> "辞書は、もっと軽くていい。" to "何を調べますか？"
         Language.DE -> "Sprache ist der Schlüssel zur Welt." to "Wonach möchten Sie suchen?"
         Language.KO -> "한 단어의 깊이" to "무엇을 찾으시나요?"
+        Language.RU -> "Слово — не воробей, вылетит — не поймаешь." to "Поиск слова…"
     }
 
     val sloganFont = when (language) {
@@ -42,6 +43,7 @@ fun MainScreen(
         Language.JA -> WulongFonts.NotoSerifJP
         Language.DE -> WulongFonts.PlayfairDisplay
         Language.KO -> FontFamily.Default
+        Language.RU -> FontFamily.Default
     }
     Box(
         modifier = Modifier

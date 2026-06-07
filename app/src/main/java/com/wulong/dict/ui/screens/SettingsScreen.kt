@@ -526,7 +526,7 @@ private fun importFromFolder(
             // If the selected folder contains a wrapper dir named after a
             // language code (en/ja/de/ko), flatten it — import its
             // contents instead of the wrapper directory itself.
-            val langCodes = setOf("en", "ja", "de", "ko")
+            val langCodes = setOf("en", "ja", "de", "ko", "ru")
             val children = if (child.name in langCodes && child.isDirectory) {
                 child.listFiles().filter { it.isDirectory }.toList()
             } else {

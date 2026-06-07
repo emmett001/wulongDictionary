@@ -46,12 +46,13 @@ fun ActivationScreen(
         Language.JA -> "辞書は、もっと軽くていい。"
         Language.DE -> "Sprache ist der Schlüssel zur Welt."
         Language.KO -> "한 단어의 깊이"
+        Language.RU -> "Слово — не воробей, вылетит — не поймаешь."
     }
 
     val sloganFont = when (language) {
         Language.EN, Language.DE -> WulongFonts.PlayfairDisplay
         Language.JA -> WulongFonts.NotoSerifJP
-        Language.KO -> androidx.compose.ui.text.font.FontFamily.Default
+        Language.KO, Language.RU -> androidx.compose.ui.text.font.FontFamily.Default
     }
 
     fun doActivate() {

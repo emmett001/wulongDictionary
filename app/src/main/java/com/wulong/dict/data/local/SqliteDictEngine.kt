@@ -155,6 +155,9 @@ class SqliteDictEngine(private val dictRootDir: File) {
         databases.clear()
     }
 
+    /** Russian-aware lowercase: lowercases and normalizes ё→е for search matching. */
+    private fun searchNormalize(s: String): String = s.lowercase().replace('ё', 'е')
+
     /** Look up a word in a specific dictionary. Returns HTML content or null. */
     fun search(keyword: String, dictId: Int): String? = searchWithRedirect(keyword, dictId, maxDepth = 3)
 
@@ -168,7 +171,7 @@ class SqliteDictEngine(private val dictRootDir: File) {
      */
     private fun searchWithRedirect(keyword: String, dictId: Int, maxDepth: Int): String? {
         val db = databases[dictId] ?: return null
-        val lower = keyword.lowercase()
+        val lower = searchNormalize(keyword)
 
         // Step 1: collect ALL distinct original_keys from search table
         val originalKeys = mutableListOf<String>()
@@ -236,7 +239,7 @@ class SqliteDictEngine(private val dictRootDir: File) {
 
     /** Prefix-based autocomplete across all dictionaries. */
     fun suggest(prefix: String, limit: Int = 20): List<Suggestion> {
-        val lower = prefix.lowercase()
+        val lower = searchNormalize(prefix)
         val results = mutableListOf<Suggestion>()
 
         for (config in configs) {
