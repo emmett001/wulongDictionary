@@ -82,6 +82,16 @@
 
 > ⚠️ **版权声明**：本仓库不包含任何词典数据。用户需自行获取 `.sqlite3` 格式的词典文件。
 
+### 获取词典文件
+
+<p align="center">
+  <strong>📱 扫描下方二维码加入微信群，领取词典文件</strong>
+  <br/>
+  <img src="assets/微信群二维码（7月12日前）.jpg" alt="微信群二维码" width="240" />
+  <br/>
+  <sub>二维码有效期至 2025年7月12日，过期后请在 <a href="https://github.com/emmett001/wulongDictionary/issues">Issues</a> 留言索要新二维码</sub>
+</p>
+
 ## 🚀 快速开始
 
 ### 安装
