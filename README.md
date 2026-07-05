@@ -1,79 +1,174 @@
-# 乌龙词典
+<p align="center">
+  <img src="assets/产品页.jpg" alt="乌龙词典" width="320" />
+</p>
 
-> *Words build worlds.* — 一本安静的口袋词典，乌龙茶气质的查词工具。
+<h1 align="center">乌龙词典</h1>
+<p align="center">
+  <em>Words build worlds.</em>
+  <br/>
+  一本安静的口袋词典 —— 五语种、全离线、零干扰。
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android" alt="Platform" />
+  <img src="https://img.shields.io/badge/language-Kotlin-7F52FF?logo=kotlin" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose" alt="Compose" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
+</p>
 
 ---
 
-## 简介
+## 📸 预览
 
-乌龙词典是一款 Android 离线词典应用。基于 SQLite3 检索引擎，支持牛津、柯林斯、韦氏大学三本权威词典的全文检索与对比阅读。
+<p align="center">
+  <img src="assets/干净专注，纯粹查词体验.jpg" alt="查词体验" width="45%" />
+  &nbsp;&nbsp;
+  <img src="assets/英语·德语专业词典.jpg" alt="英语德语词典" width="45%" />
+</p>
 
-- **完全离线** — 无需网络，词典数据存储在本地
-- **三词典并行** — 同一单词在三本词典间横向滑动切换
-- **极简设计** — 奶油色暖调、Playfair 衬线字体、安静克制的排版
-- **手工导入** — 用户自行准备词典文件，App 仅提供检索与渲染能力
+<p align="center">
+  <img src="assets/日语·韩语专业权威词典.jpg" alt="日语韩语词典" width="45%" />
+  &nbsp;&nbsp;
+  <img src="assets/产品页.jpg" alt="产品页" width="45%" />
+</p>
 
-## 技术栈
+## ✨ 为什么用乌龙词典
 
-| 层 | 技术 |
-|---|------|
-| UI | Jetpack Compose + Material 3 |
-| 导航 | Navigation Compose |
-| 架构 | Clean Architecture + 手动 DI |
-| 检索引擎 | SQLite3（只读） |
-| 数据库 | Room（搜索历史） |
-| 语言 | Kotlin |
+- **完全离线** — 所有词典数据保存在本地，查词不需要网络连接
+- **五语种覆盖** — 英语 · 德语 · 日语 · 韩语 · 俄语，每个语种独立切換
+- **多词典并排** — 同一单词在多个词典间横向滑动对比（如英语：牛津 + 柯林斯 + 韦氏大学同时检索）
+- **URL Scheme 跳转** — 支持 `@@@LINK=` 软链接重定向，自动跟踪词条引用
+- **极简克制** — 奶油色暖调主题、Playfair Display 衬线字体、零广告零推送
+- **WebView 对象池** — 预加载预热，词典页面秒开无白屏
 
-## 词典准备
+## 🌏 支持的语言与词典
 
-> 因版权原因，本仓库**不包含任何词典数据**。
+<details open>
+<summary><b>English</b> (英语)</summary>
+<table>
+<tr><td>牛津高阶英汉双解词典</td><td>OALD PE</td></tr>
+<tr><td>柯林斯高阶英汉双解词典</td><td>Collins COBUILD</td></tr>
+<tr><td>韦氏大学词典 第11版</td><td>Merriam-Webster's Collegiate 11th</td></tr>
+</table>
+</details>
 
-你需要自行获取 `.sqlite3` 格式的词典文件，并在手机上通过以下步骤导入：
+<details>
+<summary><b>Deutsch</b> (德语)</summary>
+<table>
+<tr><td>新德汉词典</td><td>Shanghai Translation Publishing House</td></tr>
+</table>
+</details>
+
+<details>
+<summary><b>日本語</b> (日语)</summary>
+<table>
+<tr><td>小学馆日中词典 第三版</td><td>Shogakukan JC Dictionary 3rd Ed.</td></tr>
+</table>
+</details>
+
+<details>
+<summary><b>한국어</b> (韩语)</summary>
+<table>
+<tr><td>Eduworld 标准韩韩中词典</td><td>Eduworld Standard KO-KO-ZH</td></tr>
+</table>
+</details>
+
+<details>
+<summary><b>Русский</b> (俄语)</summary>
+<table>
+<tr><td>大俄汉词典 БРуКС</td><td>Grand Russian-Chinese Dictionary (БРуКС)</td></tr>
+</table>
+</details>
+
+> ⚠️ **版权声明**：本仓库不包含任何词典数据。用户需自行获取 `.sqlite3` 格式的词典文件。
+
+## 🚀 快速开始
+
+### 安装
+
+从 [Releases](https://github.com/emmett001/wulongDictionary/releases) 下载最新 APK，在 Android 手机上安装即可。
+
+### 导入词典
 
 1. 下载词典压缩包，解压到手机存储
-2. 打开乌龙词典 → 右上角齿轮图标 → 设置
-3. 点击 **「导入词典文件…」**
-4. 选择解压后的文件夹
-5. App 会自动复制所有文件并加载词典
+2. 打开乌龙词典 → 右上角齿轮 ⚙️ → 设置
+3. 点击 **导入词典文件…**
+4. 选择解压后的文件夹，App 自动复制并加载
 
-词典文件目录结构应为：
+词典目录结构示例：
 
 ```
-Dictionary/
-  oaldpe/
-    oaldpe.sqlite3
-    oaldpe.css
-    oaldpe.js
-    ...
-  柯林斯高阶双解/
-    柯林斯高阶双解.sqlite3
-    ...
-  Merriam-Webster's Collegiate Dictionary 11th Edtion/
-    Merriam-Webster's Collegiate Dictionary 11th Edtion.sqlite3
-    ...
+dicts/
+  en/
+    oaldpe/
+      oaldpe.sqlite3
+      oaldpe.css
+      oaldpe.js
+      oaldpe.png
+    Collins/
+      Collins.sqlite3
+    MW-11/
+      MW-11.sqlite3
+  ja/
+    Shogakukan/
+      Shogakukan.sqlite3
+  de/
+    新德汉/
+      新德汉.sqlite3
+  ko/
+    Eduworld/
+      Eduworld.sqlite3
+  ru/
+    BRUKS/
+      BRUKS.sqlite3
 ```
 
-## 安装
-
-从 [Releases](../../releases) 下载 `乌龙词典.apk`，在 Android 手机上直接安装。
-
-或自行编译：
+### 自行编译
 
 ```bash
 git clone https://github.com/emmett001/wulongDictionary.git
 # 用 Android Studio 打开项目 → Build → Build APK(s)
+# 或直接 ./gradlew assembleDebug
 ```
 
-## 截图
+## 🏗️ 技术架构
 
-> 待补充
+```
+app/src/main/java/com/wulong/dict/
+├── MainActivity.kt          ← NavHost + 边缘到边
+├── AppContainer.kt          ← 手动 DI 容器（无 Hilt/Dagger）
+├── ui/
+│   ├── screens/             ← Main / Search / Entry / Settings / Activation
+│   ├── theme/               ← Material 3 + Playfair Display 字体
+│   └── pool/                ← WebView 对象池（预加载、复用）
+├── domain/
+│   ├── model/               ← Entity、Suggestion、Language
+│   └── usecase/             ← 6 个 Use Case（搜索 / 建议 / 历史 CRUD）
+└── data/
+    ├── local/               ← SqliteDictEngine（只读 SQLite3）+ Room DB
+    └── repository/          ← 接口实现
+```
 
-## License
+| 层 | 技术选型 |
+|---|---------|
+| UI 框架 | Jetpack Compose + Material 3 |
+| 导航 | Navigation Compose + HorizontalPager |
+| 架构 | Clean Architecture · 手动 DI |
+| 检索引擎 | SQLite3 (只读 · LIKE 前缀匹配 · @@@LINK= 重定向) |
+| 历史存储 | Room (SQLite) |
+| WebView | 对象池预加载 · PagerAware · 资源复用 |
+| 语言 | Kotlin |
 
-本项目代码采用 MIT License。
+## 📄 License
 
-词典数据版权归原作者 / 出版社所有，本项目不提供、不分发、不附带任何词典内容。
+本项目代码采用 [MIT License](LICENSE)。
+
+词典数据版权归原作者 / 出版社所有。本项目不提供、不分发、不附带任何词典内容。
 
 ---
 
-*Made with oolong tea & Compose.*
+<p align="center">
+  <sub>Made with oolong tea & Compose 🍵</sub>
+  <br/>
+  <sub>© 2024–2025 LunaireReverie</sub>
+</p>

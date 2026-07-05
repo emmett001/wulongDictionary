@@ -18,7 +18,12 @@
 /app/release/
 *.ico
 *.py
-DEBUG.md
-UI_OVERVIEW.md
-技术栈.png
+/docs/DEBUG.md
+/docs/graphify/
+/docs/乌龙词典_内测Bug追踪表.xlsx
 .claude/
+CLAUDE.md
+*.local
+/邀请函/
+/server-activation/
+/scf-activation/
